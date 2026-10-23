@@ -1,0 +1,86 @@
+{
+  "tabularTestScenarios": 82,
+  "endToEndScenario": "E2E-01",
+  "packageChecks": [
+    "Document references exist",
+    "UTF-8 text contains no replacement characters",
+    "Markdown code fences balanced",
+    "Test IDs unique",
+    "Calendar, age and memory examples verified"
+  ],
+  "proposedNewUnityPath": "C:\\UnityProjects\\ServerClosed_New\\Game",
+  "gameValidation": {
+    "playMode": "NOT RUN",
+    "editMode": "NOT RUN",
+    "physicalDevice": "NOT RUN",
+    "androidBuild": "NOT RUN",
+    "unityCompile": "NOT RUN"
+  },
+  "files": [
+    {
+      "bytes": 7449,
+      "name": "00_START_HERE.md",
+      "sha256": "1fff9ba6ad06173c7c1d8e3950378a237158fafd1690b72cab1b3910770cd616"
+    },
+    {
+      "bytes": 14282,
+      "name": "01_GDD.md",
+      "sha256": "7d1003d4fe4b5d11ca3ed074848f763ec080f4bdf7d33aee0f644731815bf93f"
+    },
+    {
+      "bytes": 25179,
+      "name": "02_TIME_LIFE_SOUL.md",
+      "sha256": "52aaf5378db5fb93ba11c75fc1044071bb89f230ac6704583e758f7c7e2d27c5"
+    },
+    {
+      "bytes": 19634,
+      "name": "03_GENES_RPG_MAGIC_CHESS.md",
+      "sha256": "5ceaceb1450d730d2b6037b5531e428a253af1f014772c6d1513343be59ed87f"
+    },
+    {
+      "bytes": 21064,
+      "name": "04_LIVING_WORLD.md",
+      "sha256": "62ab57c65ee048f62686fa5d73a95b4f52c96a61e7109baee843507a454b88d6"
+    },
+    {
+      "bytes": 21250,
+      "name": "05_TECHNICAL_ARCHITECTURE.md",
+      "sha256": "65c636ff0656765a08982d4f50031f6c137cc18a1645a89c77ca96bb69bebb11"
+    },
+    {
+      "bytes": 14652,
+      "name": "06_ROADMAP.md",
+      "sha256": "f02a679d97191994d94fffaab9a16a05b50085b9fc50b222fc1ccc84b636f4ca"
+    },
+    {
+      "bytes": 17773,
+      "name": "07_TESTS_ACCEPTANCE.md",
+      "sha256": "f4c3d6746ee8f18a472b4a534c51b1e6fdcdcc76f90f691d550f8ed5d4f7aaeb"
+    },
+    {
+      "bytes": 10346,
+      "name": "08_CLAUDE_START_PROMPT.md",
+      "sha256": "6613b753ae9e047e61300437fc530a33c6d9a429c160338ecd6f2c2cfc307674"
+    },
+    {
+      "bytes": 12336,
+      "name": "09_DECISIONS_EVIDENCE_GATEWAY.md",
+      "sha256": "4c6c79d5dd7a0312f1bd8e400a0fa2c2302fccb27609932c3ee5865628fbc50f"
+    },
+    {
+      "bytes": 6400,
+      "name": "10_CLAUDE_PROJECT_RULES.md",
+      "sha256": "66100a35b86ac8fe5c003014a2a18b6dc870fc777f4ca3540448f5d3283b6a56"
+    },
+    {
+      "bytes": 12633,
+      "name": "11_STARTER_CONTENT.md",
+      "sha256": "8da125e6f1586b6755a9111ef42f33185afba14285022d96f7b849c20a1715ad"
+    }
+  ],
+  "documents": 12,
+  "projectCreated": false,
+  "packageVersion": "1.0",
+  "projectMode": "new_separate_project_keep_old",
+  "date": "2026-10-23"
+}

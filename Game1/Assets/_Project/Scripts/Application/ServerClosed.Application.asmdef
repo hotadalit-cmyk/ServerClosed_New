@@ -1,0 +1,16 @@
+{
+    "name": "ServerClosed.Application",
+    "rootNamespace": "ServerClosed.Application",
+    "references": [
+        "GUID:WILL_BE_GENERATED_BY_UNITY"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
