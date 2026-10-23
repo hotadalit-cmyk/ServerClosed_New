@@ -1,0 +1,14 @@
+{
+  "name": "ServerClosed.Presentation",
+  "rootNamespace": "ServerClosed.Presentation",
+  "references": ["ServerClosed.Core", "ServerClosed.Application"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "ServerClosed.Application",
+  "rootNamespace": "ServerClosed.Application",
+  "references": ["ServerClosed.Core"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

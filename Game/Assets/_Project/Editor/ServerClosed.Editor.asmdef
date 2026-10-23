@@ -1,0 +1,20 @@
+{
+  "name": "ServerClosed.Editor",
+  "rootNamespace": "ServerClosed.Editor",
+  "references": [
+    "ServerClosed.Core",
+    "ServerClosed.Application",
+    "ServerClosed.Presentation"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
