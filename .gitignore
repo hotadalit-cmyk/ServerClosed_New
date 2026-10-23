@@ -1,0 +1,42 @@
+# Unity generated
+/Game/[Ll]ibrary/
+/Game/[Tt]emp/
+/Game/[Oo]bj/
+/Game/[Bb]uild/
+/Game/[Bb]uilds/
+/Game/[Ll]ogs/
+/Game/[Uu]ser[Ss]ettings/
+
+# Unity Editor / IDE
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Artifacts
+/Artifacts/*.apk
+/Artifacts/*.aab
+/Artifacts/*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# Rider
+.idea/
