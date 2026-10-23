@@ -2,6 +2,7 @@
     "name": "ServerClosed.Presentation",
     "rootNamespace": "ServerClosed.Presentation",
     "references": [
+        "GUID:14a89bd033c269c4aa2b9d39e717ea41",
         "GUID:1e376e8a88f5b264b93c949f4c6660ee"
     ],
     "includePlatforms": [],
