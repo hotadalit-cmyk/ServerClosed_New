@@ -1,0 +1,20 @@
+{
+    "name": "ServerClosed.Infrastructure.Editor",
+    "rootNamespace": "ServerClosed.Editor",
+    "references": [
+        "GUID:14a89bd033c269c4aa2b9d39e717ea41",
+        "GUID:1e376e8a88f5b264b93c949f4c6660ee",
+        "GUID:b4e0cf033aaa29c4e85ea0b00b188f50"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
