@@ -240,9 +240,14 @@ namespace ServerClosed.Core
                     if (mt == typeof(List<Achievement>)) { SetList<Achievement>(src, target, f, pr); return; }
                     if (mt == typeof(List<PastLifeRecord>)) { SetList<PastLifeRecord>(src, target, f, pr); return; }
                     if (mt == typeof(List<RegionOdds>)) { SetList<RegionOdds>(src, target, f, pr); return; }
+                    if (mt == typeof(List<Npc>)) { SetList<Npc>(src, target, f, pr); return; }
+                    if (mt == typeof(List<ChessUnitDef>)) { SetList<ChessUnitDef>(src, target, f, pr); return; }
+                    if (mt == typeof(List<ChessUnit>)) { SetList<ChessUnit>(src, target, f, pr); return; }
                     if (mt == typeof(List<DungeonFloor>)) { SetList<DungeonFloor>(src, target, f, pr); return; }
                     if (mt == typeof(List<DungeonCache>)) { SetList<DungeonCache>(src, target, f, pr); return; }
                     if (mt == typeof(Dictionary<string, DungeonState>)) { var d2 = new Dictionary<string, DungeonState>(); foreach (var kv in (Dictionary<string, object>)src) { var ds = new DungeonState(); Assign(ds, kv.Value); d2[kv.Key] = ds; } Set(target, f, pr, d2); return; }
+                    if (mt == typeof(Dictionary<string, double>)) { var d3 = new Dictionary<string, double>(); foreach (var kv in (Dictionary<string, object>)src) d3[kv.Key] = kv.Value is double ? (double)kv.Value : Convert.ToDouble(kv.Value, System.Globalization.CultureInfo.InvariantCulture); Set(target, f, pr, d3); return; }
+                    if (mt == typeof(Dictionary<string, int>)) { var d4 = new Dictionary<string, int>(); foreach (var kv in (Dictionary<string, object>)src) d4[kv.Key] = kv.Value is int ? (int)kv.Value : (int)Convert.ToDouble(kv.Value, System.Globalization.CultureInfo.InvariantCulture); Set(target, f, pr, d4); return; }
                     // вложенный POCO
                     if (curVal != null && !(src is List<object>) && !(src is Dictionary<string, object>)) { Assign(curVal, src); return; }
                     var inst = Activator.CreateInstance(mt);

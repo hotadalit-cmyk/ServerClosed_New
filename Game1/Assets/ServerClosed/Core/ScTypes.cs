@@ -57,6 +57,7 @@ namespace ServerClosed.Core
     {
         public int id;
         public string species;
+        public string name;            // имена особых существ (боссы, Рваное Ухо)
         public float x, y, vx, vy;
         public double hp;
         public double ageDays;
@@ -105,6 +106,8 @@ namespace ServerClosed.Core
         public List<string> perks = new List<string>();
         // дары тела от варианта перерождения (§11.3 ReincarnOption.mods)
         public double bonusMaxHp, bonusAtk, bonusDef, bonusSpeed, bonusPerception;
+        // изученные виды этой жизни (веб: player.discoveredSpecies — в момент поглощения)
+        public List<string> discoveredSpecies = new List<string>();
     }
 
     // ===== Восприятие (Дополнение к ТЗ) =====
@@ -160,17 +163,32 @@ namespace ServerClosed.Core
         }
     }
 
-    // ===== Поселение (§15, упрощённо) =====
+    // ===== Поселение (§15) и NPC посёлка =====
     [Serializable]
     public class VillageState
     {
         public string name = "Опушка";
         public string stage = "Хутор";
-        public int population = 6;
-        public double food = 12;
-        public double stability = 70;
+        public int population = 11;
+        public double food = 40;
+        public double stability = 60;
+        public double military = 25;
         public int raidsSurvived;
-        public double raidCdDays;                // передышка после набега (Свет продлевает)
+        public double raidCdDays = 2;            // передышка после набега (Свет продлевает)
+        public bool raidPending;                 // стая у ограды — ждёт обороны (Magic Chess)
+        public double raidDeadline;              // день, когда игнор обернётся разорением
+    }
+
+    [Serializable]
+    public class Npc
+    {
+        public string id, name, role;
+        public float x, y;
+        public double ageDays;
+        public double lifespan;
+        public bool alive = true;
+        public double attitude = 50;
+        public string dialogue = "hello";        // hello | hello_successor
     }
 
     // ===== История/карма =====
@@ -239,6 +257,43 @@ namespace ServerClosed.Core
     [Serializable]
     public class RegionOdds { public string id; public string name; public string difficulty; public int pct; public int order; }
 
+    // ===== Magic Chess (§14, §20): временные боевые копии — не существа мира =====
+    [Serializable]
+    public class ChessUnitDef
+    {
+        public string id, name, role, species;
+        public double hp, atk, def;
+        public int range, atkCdMs;
+        public string trait;
+        public List<string> synergies = new List<string>();
+    }
+
+    [Serializable]
+    public class ChessUnit
+    {
+        public int uid;
+        public string defId, side;               // player | enemy
+        public int r, c;
+        public double hp, cd;
+        public bool alive = true;
+        public double stunT, slowT, poisonT;
+    }
+
+    [Serializable]
+    public class ChessState
+    {
+        public string phase = "setup";           // setup | battle | result
+        public int round;
+        public int boardR, boardC;
+        public List<ChessUnitDef> playerRoster = new List<ChessUnitDef>();
+        public List<ChessUnit> placed = new List<ChessUnit>();
+        public List<ChessUnit> enemies = new List<ChessUnit>();
+        public int reserveLimit;
+        public List<string> battleLog = new List<string>();
+        public double worldMinutesSpent;
+        public string scenario, stake, result;   // result: win | lose (только в фазе result)
+    }
+
     // ===== Мир целиком (единственный сейв-корень, §18) =====
     [Serializable]
     public class WorldData
@@ -255,6 +310,7 @@ namespace ServerClosed.Core
         public SensoryState senses = new SensoryState();
         public DigestiveState digestion = new DigestiveState();
         public VillageState village = new VillageState();
+        public List<Npc> npcs = new List<Npc>();
         public List<HistoryEntry> log = new List<HistoryEntry>();
         public List<KarmaEvent> karmaEvents = new List<KarmaEvent>();
         public double karma = 0;                 // -100..100 текущей жизни (§12)
@@ -279,8 +335,15 @@ namespace ServerClosed.Core
         public string birthRegionNext;           // регион, выпавший по итогам суда (ролл при суде)
         public List<RegionOdds> judgmentOdds = new List<RegionOdds>(); // доли на момент суда
         public int lastSkipDays;                 // сколько дней мир жил без игрока (для тоста)
+        // ===== Полная игра (v1.3) =====
+        public ChessState chess;                 // текущий бой Magic Chess (null — нет боя)
+        public Dictionary<string, double> flags = new Dictionary<string, double>(); // флаги-события (веб: Record<string,number>)
+        public Dictionary<string, int> worldRegions = new Dictionary<string, int>(); // «Чаша Отголосов»: открытые места (п.9)
+        public double flagStealCd;               // кража со склада: не раньше этого дня
+        public double flagWolvesKilled;          // счётчик волков (ретроактивный прогресс задания)
         // рантайм (не сохраняются: очередь событий эффектов живёт один кадр)
         [NonSerialized] public List<FxEvent> fx = new List<FxEvent>();
+        [NonSerialized] public string lastDiscoveredRegion;   // движок забирает для тоста (consume)
         public string toast;                     // одноразовый тост для UI
         public string toastKind;
 
@@ -290,6 +353,13 @@ namespace ServerClosed.Core
             return null;
         }
         public void PushToast(string text, string kind) { toast = text; toastKind = kind; }
+        /// Значение флага (веб: flags[key] ?? 0).
+        public double Flag(string key)
+        {
+            double v;
+            return flags.TryGetValue(key, out v) ? v : 0;
+        }
+        public void SetFlag(string key, double v) { flags[key] = v; }
     }
 
     [Serializable]
