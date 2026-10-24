@@ -20,6 +20,10 @@ namespace ServerClosed.Core
         public double senseTime;
         public bool coreActive;
         public readonly List<KarmaEvent> pendingJudgment = new List<KarmaEvent>();
+        public JudgmentResult lastJudgment;      // кэш экрана Суда; итоги применены к душе один раз
+        // опасности региона (regions.ts updateRegion — рантайм)
+        double poisonAcc; bool poisonLogged;
+        double stormT, stormHit; double stormCd = 22; int stormSurvived;
 
         // ===== Создание мира =====
         public static ScWorld NewGame(int seed, int lifeNo)
@@ -31,10 +35,12 @@ namespace ServerClosed.Core
             w.clock = new WorldClock(d.minutes) { dayTickCounter = d.dayTicks };
             w.stats = w.RecomputeStats();
 
-            // Тихая колыбель — стартовое место (посёлок −6.5, +6.5)
-            var spawn = new Vec(26 - 6.5f, 24 + 6.5f);
+            // Тихая колыбель — стартовое место (посёлок −6.5, +6.5) — точка рождения quiet_cradle
+            var spawn = ScRegions.SpawnPoint("quiet_cradle", d);
             d.player.x = spawn.x; d.player.y = spawn.y;
             d.player.hp = w.stats.maxHp;
+            d.soul = ScSoul.NewSoul();
+            d.achievements = ScSoul.InitAchievements();
 
             w.SpawnInitialPops();
             w.EnterBirthNest();
@@ -44,6 +50,7 @@ namespace ServerClosed.Core
 
         public static ScWorld FromData(WorldData d)
         {
+            ScSoul.EnsureMigration(d);   // сейвы v1.1 без души получают пустую душу с номером жизни
             var w = new ScWorld { data = d };
             w.rng = new ScRng((int)((uint)d.seed ^ (uint)(d.dayTicks * 265443576)));
             w.clock = new WorldClock(d.minutes) { dayTickCounter = d.dayTicks };
@@ -72,6 +79,9 @@ namespace ServerClosed.Core
                     d.maxHp += g.maxHp * 0.6; d.atk += g.atk * 0.6; d.def += g.def * 0.6;
                 }
             }
+            // дары тела от варианта перерождения (§11.3)
+            d.maxHp += p.bonusMaxHp; d.atk += p.bonusAtk; d.def += p.bonusDef;
+            d.speed += p.bonusSpeed; d.perception += p.bonusPerception;
             return d;
         }
 
@@ -80,32 +90,231 @@ namespace ServerClosed.Core
         public void CaptureState() { data.rngState = rng.State; }
 
         // A new body in the existing world; world history, clock and population survive.
+        // Поток перерождения — порт engine.ts reincarnate: суд уже применён к душе (RunJudgment
+        // при смерти), здесь — небытие (скачок времени), новое тело, ролл региона (ролл сделан при суде).
         public bool Reincarnate()
         {
-            if (data.deathCause == null) return false;
-            var known = new List<string>(data.player.knownGenes);
-            var perks = new List<string>(data.player.perks);
+            if (data.deathCause == null || data.soul == null) return false;
+            if (data.judged == 0) RunJudgment();      // страховка: суд обязателен до перерождения
+            var soul = data.soul;
+
+            // 1) Небытие между жизнями (§3.3): глубокая память души дольше не воплощается
+            int skipDays = Math.Min(600, (int)Math.Round((60 + soul.life * 30) * (1 + soul.traits.memory / 100.0 * 1.5)));
+            data.lastSkipDays = skipDays;
+            clock.Advance(skipDays * 1440.0);
+            data.minutes = clock.minutes;
+            data.dayTicks = clock.dayTickCounter;
+            ScSoul.AdvanceWorldAfterDeath(data, lastJudgment != null ? lastJudgment.verdict : "Равновесие",
+                data.deathCauseCode != null ? data.deathCauseCode : "killed", skipDays, clock.TotalDays);
+
+            // 2) Новое тело: душа сохраняет ограниченную часть знаний (§11.3)
+            int carryCount = Math.Max(0, Math.Min(2, soul.level - 1));
+            var pool = new List<string>(data.player.knownGenes);
+            rng.Shuffle(pool);
+            var carried = new List<string>();
+            for (int i = 0; i < pool.Count && carried.Count < carryCount; i++) carried.Add(pool[i]);
+            // вариант тела: лучший из доступных душе (выбор в UI — следующий шаг; в вебе выбирает игрок)
+            var opts = ScSoul.ReincarnationOptions(soul);
+            ReincarnOption opt = opts[opts.Count - 1];
+
             data.lifeNo++;
-            data.player = new PlayerState { knownGenes = known, perks = perks };
+            data.player = new PlayerState
+            {
+                knownGenes = carried,
+                perks = opt.perkGene != null ? new List<string> { opt.perkGene } : new List<string>(),
+                ageDays = 0.4,
+                biomass = 8 * soul.level,   // наследие: немного биомассы от уровня души
+                bonusMaxHp = opt.maxHp, bonusAtk = opt.atk, bonusDef = opt.def,
+                bonusSpeed = opt.speed, bonusPerception = opt.perception
+            };
             data.senses = new SensoryState();
             data.digestion = new DigestiveState();
             data.karma = 0;
+            data.karmaTotal = 0;
             data.deathCause = null;
-            data.senseCore = data.nestExited = data.inNest = data.nestReadyShown = 0;
+            data.deathCauseCode = null;
+            data.judged = 0;
+            lastJudgment = null;
+            data.karmaEvents.Clear();            // суд прочитал ведомость — жизнь начинается с чистым листом
+            data.senseCore = soul.resonantCore ? 1 : 0;   // ядро — свойство души, а не тела
+            data.nestExited = data.inNest = data.nestReadyShown = 0;
             data.activeDungeon = null;
+            // подземелья перерождаются вместе с миром: обитатели забывают прошлые визиты (§11)
+            foreach (var kv in data.dungeons)
+            {
+                kv.Value.active = false; kv.Value.depth = 1;
+                foreach (DungeonCache cache in kv.Value.caches) cache.taken = false;
+            }
             data.dungeons.Remove("birth_nest");
-            data.creatures.RemoveAll(c => c.dungeonId == "birth_nest");
-            var birth = data.Poi("village");
-            data.player.x = birth != null ? birth.x : 26;
-            data.player.y = birth != null ? birth.y : 24;
+            data.creatures.RemoveAll(c => c.dead || c.dungeonId != null);
+            // немного живности у деревни, чтобы новая жизнь началась живой (первая добыча вплотную)
+            var vil = data.Poi("village");
+            Vec vp = vil != null ? Vec.Of(vil.x, vil.y) : Vec.Of(26, 24);
+            for (int i = 0; i < 3; i++) SpawnNearPos("slug", vp, 1.0, 3.0);
+            SpawnNearPos("rabbit", vp, 1.5, 4.0);
+
+            // 3) Место рождения: ролл сделан при суде из долей регионаOdds (§23 — детерминирован сидом).
+            string region = data.birthRegionNext != null ? data.birthRegionNext : "quiet_cradle";
+            ApplyRegionBirth(region);
+            soul.birthRegion = region;
+
             HealPlayerPosition();
             RefreshStats();
             data.player.hp = stats.maxHp;
             senseMap.Clear(); pendingJudgment.Clear();
             EnterBirthNest();
-            PushLog("Новое воплощение №" + data.lifeNo + ". Мир продолжает жить.", "life");
+            var rdef = ScRegions.Region(region);
+            PushLog("Резонанс души привёл вас: " + rdef.name + " (" + rdef.difficulty + " сложность). Мир жил без вас " + skipDays + " дн.", "life");
+            data.PushToast("Вы рождены: " + rdef.name + " · " + rdef.difficulty + " сложность. Мир жил без вас " + skipDays + " дн.", "epic");
             CaptureState();
             return true;
+        }
+
+        // ===== Место рождения (regions.ts applyRegionBirth): позиция + гарантированная первая пища =====
+        void ApplyRegionBirth(string regionId)
+        {
+            RegionDef def = ScRegions.Region(regionId);
+            data.birthRegion = regionId;
+            Vec pt = ScRegions.SpawnPoint(regionId, data);
+            if (!IsWalkable(pt.x, pt.y))
+            {
+                for (int i = 0; i < 28; i++)
+                {
+                    double a = rng.Next() * Math.PI * 2;
+                    double r = rng.Range(0.8, 3.2);
+                    double x = pt.x + Math.Cos(a) * r, y = pt.y + Math.Sin(a) * r;
+                    if (IsWalkable(x, y)) { pt = Vec.Of(x, y); break; }
+                }
+            }
+            var p = data.player;
+            p.x = pt.x; p.y = pt.y; p.vx = 0; p.vy = 0; p.facing = 1;
+            foreach (string[] plan in def.spawnPlan)
+            {
+                int n;
+                if (!int.TryParse(plan[1], out n)) n = 1;
+                bool first = plan[0] == "slug";
+                for (int i = 0; i < n; i++) SpawnNearPos(plan[0], pt, first ? 1.0 : 1.2, first ? 2.0 : 3.4);
+            }
+            senseMap.Clear();
+        }
+
+        /// Существо рядом с точкой (world.ts spawnNearPos): до 12 попыток найти проходимое место.
+        void SpawnNearPos(string species, Vec pt, double rMin, double rMax)
+        {
+            for (int i = 0; i < 12; i++)
+            {
+                double a = rng.Next() * Math.PI * 2;
+                double r = rng.Range(rMin, rMax);
+                double x = pt.x + Math.Cos(a) * r, y = pt.y + Math.Sin(a) * r;
+                if (IsWalkable(x, y)) { SpawnCreature(species, Vec.Of(x, y), 1); return; }
+            }
+            SpawnCreature(species, pt, 1); // последняя попытка — в самой точке
+        }
+
+        // ===== Суд души (§11.2): применяется к душе РОВНО ОДИН РАЗ на смерть (safe к перезагрузкам) =====
+        public JudgmentResult RunJudgment()
+        {
+            if (data.deathCause == null || data.soul == null) return null;
+            if (data.judged != 0) return lastJudgment;
+            var j = ScSoul.Judge(data.soul, data, data.achievements);
+            data.judged = 1;
+            lastJudgment = j;
+            // доли региона на момент суда + детерминированный ролл места рождения (§23)
+            data.judgmentOdds = j.regionOdds;
+            var weights = new Dictionary<string, double>();
+            foreach (RegionOdds o in j.regionOdds) weights[o.id] = Math.Max(1, o.pct);
+            data.birthRegionNext = ScRegions.RollRegion(weights, rng.Next());
+            PushLog("Суд души: " + j.verdict + ". " + j.summary, "life");
+            return j;
+        }
+
+        /// Экран суда после перезагрузки: итоги уже в душе — восстанавливаем картину из сохранённых данных.
+        public JudgmentResult JudgmentView()
+        {
+            if (lastJudgment != null) return lastJudgment;
+            if (data.deathCause == null || data.soul == null || data.judged == 0) return null;
+            var j = new JudgmentResult
+            {
+                ageDays = 0,
+                cause = data.deathCauseCode != null ? data.deathCauseCode : "killed",
+                karma = data.soul.karma,
+                verdict = data.soul.karma >= 40 ? "Свет" : data.soul.karma <= -40 ? "Тьма" : "Равновесие",
+                xpGained = 0,
+                summary = "Воплощение №" + Math.Max(1, data.soul.life - 1) + " завершено. Итоги суда уже в душе.",
+                newSoulLevel = data.soul.level,
+                levelUp = false,
+                regionOdds = data.judgmentOdds != null && data.judgmentOdds.Count > 0
+                    ? data.judgmentOdds
+                    : ScRegions.NormalizeWeights(ScRegions.BirthWeights(data.soul.traits, data.soul.karma, data)),
+                regionReasons = ScRegions.ExplainBirth(data.soul.traits, data.soul.karma, data)
+            };
+            return j;
+        }
+
+        // ===== Опасности региона (regions.ts updateRegion + world.ts hazard): надземье, живое тело =====
+        void UpdateRegionHazards(double dt)
+        {
+            if (DungeonActive) return;   // в норке/подземелье региональная погода не достаёт
+            RegionDef def = ScRegions.Region(data.birthRegion);
+            var p = data.player;
+            if (def.hazard == "poison_spores")
+            {
+                bool protectedBy = p.genome.installed.Contains("spore_veil") || p.genome.installed.Contains("spore_cloud");
+                Poi grove = data.Poi("mushroom_grove");
+                bool inGrove = grove != null && ScRng.Dist(p.x, p.y, grove.x, grove.y) < grove.r + 1.5;
+                if (!protectedBy && inGrove)
+                {
+                    poisonAcc += dt;
+                    if (!poisonLogged)
+                    {
+                        poisonLogged = true;
+                        PushLog("Ядовитые споры Сада жалят незащищённое тело (споровая защита спасла бы).", "life");
+                    }
+                    if (poisonAcc >= 8)
+                    {
+                        poisonAcc = 0;
+                        p.hp -= 1; p.hitFlash = 1;
+                        PushFx("dmg", p.x, p.y, "-1", "150,220,120");
+                        if (p.hp <= 0) KillPlayer("killed", "Ядовитые споры Сада убили тело.");
+                    }
+                }
+                else { poisonAcc = 0; poisonLogged = false; }
+            }
+            if (def.hazard == "rift_storm")
+            {
+                Poi rift = data.Poi("rift");
+                bool nearRift = rift != null && ScRng.Dist(p.x, p.y, rift.x, rift.y) < 12;
+                if (stormT > 0)
+                {
+                    stormT = Math.Max(0, stormT - dt);
+                    if (nearRift)
+                    {
+                        stormHit += dt;
+                        if (stormHit >= 2)
+                        {
+                            stormHit = 0;
+                            p.hp -= 1; p.hitFlash = 1;
+                            PushFx("dmg", p.x, p.y, "-1", "190,120,235");
+                            if (p.hp <= 0) KillPlayer("killed", "Буря Разлома выжгла тело.");
+                        }
+                    }
+                    if (stormT == 0)
+                    {
+                        stormSurvived++;
+                        if (stormSurvived >= 3) data.riftStormSurvived = 1;   // глубина души в суде
+                        PushLog("Буря Разлома стихла. Воздух звенит остаточной магией.", "world");
+                    }
+                }
+                else
+                {
+                    stormCd -= dt;
+                    if (stormCd <= 0)
+                    {
+                        stormCd = 25; stormT = 5; stormHit = 0;
+                        PushLog("БУРЯ РАЗЛОМА: реальность трещит, магические потоки выжигают всё живое.", "world");
+                    }
+                }
+            }
         }
 
         // ===== Проходимость =====
@@ -266,6 +475,7 @@ namespace ServerClosed.Core
             UpdateProximity();
             UpdateSenses(dtReal);
             ScSenses.TickSenses(data.senses, dtReal);
+            UpdateRegionHazards(dtReal);   // погода региона течёт в реальном времени (как в вебе)
         }
 
         private bool IsInBattle()
@@ -373,7 +583,7 @@ namespace ServerClosed.Core
                         data.player.hitFlash = 1;
                         shakeT = 0.28;
                         PushFx("hit", p.x, p.y, null, "220,90,90");
-                        if (data.player.hp <= 0) KillPlayer("Вас разорвал " + def.name + ".");
+                        if (data.player.hp <= 0) KillPlayer("killed", "Вас разорвал " + def.name + ".");
                     }
                     break;
                 case "guard":
@@ -443,14 +653,21 @@ namespace ServerClosed.Core
                 data.player.kills++;
                 PushFx("kill", c.x, c.y, null, def.sentient ? "201,160,220" : "150,190,110");
                 if (def.sentient) Karma("kill_sentient", "Убийство разумного: " + def.name, -20, "bad");
+                // мир помнит павших владык подземелий (веса рождения + достижения души)
+                if (c.species == "myco_monarch") data.monarchKilled = 1;
+                if (c.species == "crystal_titan") data.titanKilled = 1;
             }
         }
 
-        private void KillPlayer(string cause)
+        /// Смерть тела: code — машиночитаемая причина (old_age|killed|mutation), text — для журнала/экрана.
+        public void KillPlayer(string code, string text)
         {
+            if (data.deathCause != null) return;   // смерть наступает один раз (§18 идемпотентность)
             data.player.hp = 0;
-            data.deathCause = cause;
-            PushLog(cause + " Тело растеклось лужей.", "life");
+            data.deathCauseCode = code;
+            data.deathCause = text;
+            PushLog(text, "life");
+            RunJudgment();   // суд применяется сразу и один раз — итоги переживают перезагрузку
         }
 
         // ===== Поглощение (§5) → пищеварение (§6) =====
@@ -467,7 +684,8 @@ namespace ServerClosed.Core
             }
             if (best == null) return false;
             var def = Species.Get(best.species);
-            double mass = rng.Range(def.bioMin, Math.Max(def.bioMin, def.bioMax));
+            RegionMods rm = ScRegions.Region(data.birthRegion).mods;
+            double mass = rng.Range(def.bioMin, Math.Max(def.bioMin, def.bioMax)) * rm.biomassMul;
             string reason;
             if (!ScDigestion.CanAbsorb(data.digestion, AbsorbCapacity(), mass, out reason))
             {
@@ -481,6 +699,7 @@ namespace ServerClosed.Core
             if (!SensesData.DietFeed.TryGetValue(best.species, out diet)) diet = new double[0];
             double ore;
             double oreYield = SensesData.OreYield.TryGetValue(best.species, out ore) ? ore : 0;
+            if (oreYield > 0) oreYield += rm.oreBonus;   // Забытая жила богаче рудой (п.7)
 
             var item = new StoredItem
             {
@@ -492,7 +711,7 @@ namespace ServerClosed.Core
                 diet = diet,
                 oreYield = oreYield,
                 genePool = def.geneDrop,
-                geneChance = def.geneChance,
+                geneChance = def.geneChance * rm.geneChanceMul,   // Костяные теснины щедрее на гены (§ п.7)
                 toxicity = comp[2],
                 progress = 0,
                 seed = rng.Int(0, 999999),
@@ -500,6 +719,7 @@ namespace ServerClosed.Core
             ScDigestion.PutItem(data.digestion, item);
             best.absorbed = true;
             data.player.absorbedCount++;
+            if (best.species == "spirit") data.spiritAbsorbed = 1;   // воспоминание m_rift + глубина души
             Karma("absorb_" + best.species, "Поглощение: " + def.name, def.sentient ? -8 : 0, def.sentient ? "bad" : "neutral");
             PushFx("absorb", best.x, best.y, "+" + Math.Round(mass), "154,200,96");
             return true;
@@ -562,7 +782,7 @@ namespace ServerClosed.Core
             foreach (var s in d2.synergies)
                 if (!data.synDiscovered.Contains(s.id)) { data.synDiscovered.Add(s.id); PushLog("Синергия: «" + s.name + "». " + s.desc, "life"); }
             // старение чуть-чуть замедляется от еды
-            if (data.player.hp <= 0) KillPlayer("Тело не выдержало.");
+            if (data.player.hp <= 0) KillPlayer("mutation", "Тело не выдержало.");
         }
 
         private Dictionary<string, double> SenseThrMul()
@@ -936,7 +1156,7 @@ namespace ServerClosed.Core
             RefreshStats();
             // смертность игрока (Гомпертц §10)
             double mort = ScAging.DailyMortality(p.ageDays, stats.lifeDays);
-            if (rng.Chance(mort)) { KillPlayer("Тело состарилось и растеклось."); return; }
+            if (rng.Chance(mort)) { KillPlayer("old_age", "Тело состарилось и растеклось."); return; }
 
             // старение и смерть существ, восстановление популяций
             for (int i = data.creatures.Count - 1; i >= 0; i--)
@@ -978,17 +1198,19 @@ namespace ServerClosed.Core
             }
         }
 
-        // ===== Карма (§12, счётчик последней жизни) =====
+        // ===== Карма (§12): текущая жизнь — кламп для HUD, безклампная сумма — для суда и черт; путь — от души =====
         public string KarmaPath()
         {
-            if (data.karma >= 25) return "Свет";
-            if (data.karma <= -25) return "Тьма";
+            double total = (data.soul != null ? data.soul.karma : 0) + data.karmaTotal;
+            if (total >= 25) return "Свет";
+            if (total <= -25) return "Тьма";
             return "Равновесие";
         }
 
         private void Karma(string id, string title, double delta, string tag)
         {
             data.karma = ScRng.Clamp(data.karma + delta, -100, 100);
+            data.karmaTotal += delta;   // суду нужна сумма без клампа (как flags.karmaTotal в вебе)
             data.karmaEvents.Add(new KarmaEvent { day = clock.TotalDays, year = clock.Year, id = id, title = title, karma = delta, tag = tag });
             if (delta != 0) PushLog(title + " [" + (delta > 0 ? "+" : "") + delta + " кармы]", "karma");
         }
@@ -1006,13 +1228,28 @@ namespace ServerClosed.Core
             if (data.fx.Count > 24) data.fx.RemoveRange(0, data.fx.Count - 24);
         }
 
-        // ===== Суд души (заглушка v1: вердикт по карме, §12) =====
+        // ===== Суд души (экран смерти §12): сводка из уже применённых итогов суда =====
         public string JudgmentSummary()
         {
-            string path = KarmaPath();
-            return "Смерть: " + data.deathCause + ". Путь души: " + path +
-                   ". Карма: " + Math.Round(data.karma) + ". Убито: " + data.player.kills +
-                   ". Поглощено: " + data.player.absorbedCount + ". Воплощение №" + data.lifeNo + " завершено.";
+            var j = JudgmentView();
+            if (j == null)
+            {
+                return "Смерть: " + data.deathCause + ". Путь души: " + KarmaPath() +
+                       ". Карма: " + Math.Round(data.karma) + ". Убито: " + data.player.kills +
+                       ". Поглощено: " + data.player.absorbedCount + ". Воплощение №" + data.lifeNo + " завершено.";
+            }
+            string odds = "";
+            int shown = 0;
+            foreach (RegionOdds o in j.regionOdds)
+            {
+                if (shown >= 2) break;
+                if (shown > 0) odds += " · ";
+                odds += o.name + " " + o.pct + "%";
+                shown++;
+            }
+            return "Смерть: " + data.deathCause + " Вердикт: " + j.verdict +
+                   ". Душа: ур." + j.newSoulLevel + " (" + data.soul.xp + " XP). Карма: " + Math.Round(j.karma) +
+                   ". Куда зовёт душа: " + odds + ". " + j.summary;
         }
     }
 }

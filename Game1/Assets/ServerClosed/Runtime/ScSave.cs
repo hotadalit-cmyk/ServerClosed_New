@@ -45,7 +45,9 @@ namespace ServerClosed.Runtime
         }
         public static void Validate(WorldData d)
         {
-            if (d == null || d.mapJson == null || d.mapJson.w < 1 || d.mapJson.w > 256 || d.mapJson.h < 1 || d.mapJson.h > 256 || d.mapJson.terrain == null || d.mapJson.terrain.Length != d.mapJson.w * d.mapJson.h) throw new FormatException("Некорректная карта сохранения.");
+            if (d == null) throw new FormatException("Некорректное состояние сохранения.");
+            ScSoul.EnsureMigration(d);   // сейвы v1.1 без души/достижений получают их при первом чтении
+            if (d.mapJson == null || d.mapJson.w < 1 || d.mapJson.w > 256 || d.mapJson.h < 1 || d.mapJson.h > 256 || d.mapJson.terrain == null || d.mapJson.terrain.Length != d.mapJson.w * d.mapJson.h) throw new FormatException("Некорректная карта сохранения.");
             if (d.player == null || d.player.genome == null || d.senses == null || d.senses.feed == null || d.senses.feed.Length != 8 || d.senses.unlocked == null || d.digestion == null || d.creatures == null || d.dungeons == null || d.minutes < 0 || double.IsNaN(d.minutes) || double.IsInfinity(d.minutes)) throw new FormatException("Некорректное состояние сохранения.");
             if (d.activeDungeon != null)
             {
