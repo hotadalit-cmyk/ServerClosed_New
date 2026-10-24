@@ -103,6 +103,8 @@ namespace ServerClosed.Core
         public Genome genome = new Genome();
         public List<string> knownGenes = new List<string>();
         public List<string> perks = new List<string>();
+        // дары тела от варианта перерождения (§11.3 ReincarnOption.mods)
+        public double bonusMaxHp, bonusAtk, bonusDef, bonusSpeed, bonusPerception;
     }
 
     // ===== Восприятие (Дополнение к ТЗ) =====
@@ -168,6 +170,7 @@ namespace ServerClosed.Core
         public double food = 12;
         public double stability = 70;
         public int raidsSurvived;
+        public double raidCdDays;                // передышка после набега (Свет продлевает)
     }
 
     // ===== История/карма =====
@@ -175,6 +178,66 @@ namespace ServerClosed.Core
     public class HistoryEntry { public int day, year; public string text; public string kind; }
     [Serializable]
     public class KarmaEvent { public int day, year; public string id, title; public double karma; public string tag; }
+
+    // ===== Душа (порт soul.ts + «Резонанс души» regions.ts; §11–§12) =====
+    [Serializable]
+    public class SoulTraits
+    {
+        public double resilience;   // 0..100 — устойчивость: переносит экстремальные условия
+        public double depth;        // 0..100 — духовная глубина: чувствительность к магии и душам
+        public double predator;     // 0..100 — хищная природа: склонность к насилию и поглощению
+        public double memory;       // 0..100 — память души: сила унаследованных впечатлений
+    }
+
+    [Serializable]
+    public class SoulStats
+    {
+        public int memory;          // Память
+        public int will;            // Воля
+        public int adaptation;      // Адаптация
+        public int perception;      // Восприятие
+        public int resonance;       // Резонанс
+        public int integrity;       // Целостность
+    }
+
+    [Serializable]
+    public class MemoryFragment { public string id, title, text; public bool unlocked; }
+
+    [Serializable]
+    public class Achievement { public string id, title, desc; public int soulXp; public bool got; }
+
+    [Serializable]
+    public class PastLifeRecord
+    {
+        public int life;
+        public string species;
+        public double ageDays;
+        public string cause;
+        public double karma;
+        public int xpGained;
+        public string summary;
+    }
+
+    /// Душа — отдельный от тела объект: реинкарнация заменяет тело, но не душу.
+    [Serializable]
+    public class SoulState
+    {
+        public int life = 1;                // номер текущего воплощения
+        public int xp;
+        public int level = 1;               // уровень души 1..5
+        public double karma;                // -100..100, живёт между жизнями
+        public SoulStats stats = new SoulStats();
+        public List<PastLifeRecord> pastLives = new List<PastLifeRecord>();
+        public List<MemoryFragment> memories = new List<MemoryFragment>();
+        public bool resonantCore;           // резонансное ядро сплетено — переходит между жизнями
+        public int spiritMemory;            // сколько жизней душа жила с ядром
+        public SoulTraits traits = new SoulTraits();
+        public string birthRegion = "quiet_cradle"; // регион последнего рождения
+    }
+
+    /// Доля региона в вероятности рождения (для экрана Суда; сохраняется вместе с итогом суда).
+    [Serializable]
+    public class RegionOdds { public string id; public string name; public string difficulty; public int pct; public int order; }
 
     // ===== Мир целиком (единственный сейв-корень, §18) =====
     [Serializable]
@@ -198,13 +261,26 @@ namespace ServerClosed.Core
         public List<string> synDiscovered = new List<string>();
         public Dictionary<string, DungeonState> dungeons = new Dictionary<string, DungeonState>();
         public string activeDungeon;             // null — надземье
-        public string deathCause;                // null — жив
+        public string deathCause;                // null — жив; человекочитаемая причина
+        public string deathCauseCode;            // null — жив; old_age | killed | mutation | starved
         public string birthRegion = "quiet_cradle";
         public int lifeNo = 1;
         // флаги-события
         public int alphaKilled, senseCore, nestExited, inNest, nestReadyShown;
-        // рантайм (не сохраняются значимо, но пусть лежат здесь для простоты)
-        public List<FxEvent> fx = new List<FxEvent>();
+        // флаги-события «мира, который помнит» (не сбрасываются перерождением — мир помнит)
+        public int monarchKilled, titanKilled, raidDefended, dungeonEntered, spiritAbsorbed, riftStormSurvived, wolfQuestDone;
+        public int loreRift;                     // счётчик преданий Разлома (источник появится с лором)
+        public int donateCount;                  // пожертвования посёлку (источник появится с экономикой)
+        // ===== Душа и достижения (v1.2, §11–§12) =====
+        public SoulState soul = new SoulState();
+        public List<Achievement> achievements = new List<Achievement>();
+        public double karmaTotal = 0;            // сумма поступков жизни без клампа (для суда и черт)
+        public int judged;                       // суд этой смерти уже применён
+        public string birthRegionNext;           // регион, выпавший по итогам суда (ролл при суде)
+        public List<RegionOdds> judgmentOdds = new List<RegionOdds>(); // доли на момент суда
+        public int lastSkipDays;                 // сколько дней мир жил без игрока (для тоста)
+        // рантайм (не сохраняются: очередь событий эффектов живёт один кадр)
+        [NonSerialized] public List<FxEvent> fx = new List<FxEvent>();
         public string toast;                     // одноразовый тост для UI
         public string toastKind;
 

@@ -58,13 +58,14 @@ namespace ServerClosed.Core
                     sb.Append(']');
                     return;
                 }
-                // POCO: публичные поля + свойства get;set;
+                // POCO: публичные поля (кроме [NonSerialized] — рантайм-состояние) + свойства get;set;
                 sb.Append('{');
                 var t = v.GetType();
                 bool first3 = true;
                 foreach (var f in t.GetFields())
                 {
                     if (f.IsInitOnly || f.IsStatic) continue;
+                    if (f.IsDefined(typeof(NonSerializedAttribute), false)) continue;
                     if (!first3) sb.Append(',');
                     first3 = false;
                     WriteString(sb, f.Name);
@@ -207,7 +208,7 @@ namespace ServerClosed.Core
                 foreach (var kv in dict)
                 {
                     var f = t.GetField(kv.Key);
-                    if (f != null && !f.IsStatic && !f.IsInitOnly) { SetMember(f.FieldType, f.GetValue(target), f, null, target, kv.Value); continue; }
+                    if (f != null && !f.IsStatic && !f.IsInitOnly && !f.IsDefined(typeof(NonSerializedAttribute), false)) { SetMember(f.FieldType, f.GetValue(target), f, null, target, kv.Value); continue; }
                     var pr = t.GetProperty(kv.Key);
                     if (pr != null && pr.CanWrite && pr.GetIndexParameters().Length == 0)
                         SetMember(pr.PropertyType, pr.GetValue(target, null), null, pr, target, kv.Value);
@@ -235,6 +236,10 @@ namespace ServerClosed.Core
                     if (mt == typeof(List<Creature>)) { SetList<Creature>(src, target, f, pr); return; }
                     if (mt == typeof(List<HistoryEntry>)) { SetList<HistoryEntry>(src, target, f, pr); return; }
                     if (mt == typeof(List<KarmaEvent>)) { SetList<KarmaEvent>(src, target, f, pr); return; }
+                    if (mt == typeof(List<MemoryFragment>)) { SetList<MemoryFragment>(src, target, f, pr); return; }
+                    if (mt == typeof(List<Achievement>)) { SetList<Achievement>(src, target, f, pr); return; }
+                    if (mt == typeof(List<PastLifeRecord>)) { SetList<PastLifeRecord>(src, target, f, pr); return; }
+                    if (mt == typeof(List<RegionOdds>)) { SetList<RegionOdds>(src, target, f, pr); return; }
                     if (mt == typeof(List<DungeonFloor>)) { SetList<DungeonFloor>(src, target, f, pr); return; }
                     if (mt == typeof(List<DungeonCache>)) { SetList<DungeonCache>(src, target, f, pr); return; }
                     if (mt == typeof(Dictionary<string, DungeonState>)) { var d2 = new Dictionary<string, DungeonState>(); foreach (var kv in (Dictionary<string, object>)src) { var ds = new DungeonState(); Assign(ds, kv.Value); d2[kv.Key] = ds; } Set(target, f, pr, d2); return; }
