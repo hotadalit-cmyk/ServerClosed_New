@@ -16,9 +16,36 @@ namespace ServerClosed.Validation
             "SaveFallback", "CorruptSaveRejected", "MalformedJsonRejected", "SprintSpeed", "VisionExploresMap", "FogHidesDistantEntities", "SimulationSoak",
             "SoulNewGameDefaults", "SoulLevelThresholds", "RegionWeightFormula", "RegionRollDeterminism",
             "JudgmentAppliesOnce", "JudgmentOldAgeUnlocks", "ReincarnationRegionBirth", "SoulSaveRoundtrip",
-            "RegionHazards", "WorldAdvanceAfterDeath", "OldSaveMigration"
+            "RegionHazards", "WorldAdvanceAfterDeath", "OldSaveMigration",
+            // v1.3: полная игра
+            "QuestAcceptTurnIn", "QuestRequiresChain", "QuestRetroactive", "QuestDonateProgress",
+            "SeasonRotationMods", "SeasonVillageFoodDelta", "SeasonMigrationsMove", "SeasonNeutralInDungeon",
+            "VillageStageEconomy", "RaidCycleIgnored", "RaidDefenseChess", "ChessRulesSetup",
+            "NpcDialogueOptions", "DonateStealFood", "NpcSuccession",
+            "DungeonCatacombsPort", "DungeonStairsCache", "AtlasDiscoveryFlow", "CrackSmallBodyOnly",
+            "KarmaPathThresholds", "WorldV13Roundtrip", "JudgmentBodyChoice"
         };
         static ScWorld World() { return ScWorld.NewGame(123456, 1); }
+        static ScWorld World(int seed) { return ScWorld.NewGame(seed, 1); }
+
+        /// Вывести мир на поверхность у посёлка (выход из норки по правилам гейта роста).
+        static void Surface(ScWorld w)
+        {
+            w.data.senses.biomassTotal = 8;   // гейт: усвоено ≥8 биомассы
+            var f = w.Dun.floors[0];
+            w.data.player.x = f.upX; w.data.player.y = f.upY;
+            Check(w.ExitBirthNest(), "Surface helper: exit refused");
+        }
+
+        static void Warp(ScWorld w, double x, double y)
+        {
+            var p = w.data.player;
+            p.x = (float)x; p.y = (float)y; p.vx = 0; p.vy = 0;
+            if (!w.IsWalkable(p.x, p.y)) w.HealPlayerPosition();
+        }
+
+        /// Прокрутить один дневной тик (смерть и переход сезона — как в кадрах).
+        static void TickDay(ScWorld w) { w.AdvanceDaysForTests(1); }
         public static void Run(string name)
         {
             var w = World();
@@ -176,20 +203,21 @@ namespace ServerClosed.Validation
                     Check(ScSoul.SOUL_LEVELS.Length==5, "SOUL_LEVELS size changed");
                     break;
                 case "RegionWeightFormula": {
-                    // Ручной расчёт по BirthWeights для дефолтной души (25/5/5/0) и стартового посёлка (food=12<20):
-                    // cradle 26+0+17.1-0.3-8=34.8 · garden 20+7+0+0.5=27.5 · narrows 8+2.1+0+3=13.1
+                    // Ручной расчёт по BirthWeights для дефолтной души (25/5/5/0) и стартового посёлка v1.3
+                    // (food=40, stability=60 — сытый посёлок, без штрафа −8, как в вебе при newGame):
+                    // cradle 26+0+17.1-0.3=42.8 · garden 20+7+0+0.5=27.5 · narrows 8+2.1+0+3=13.1
                     // vein 5+7+0.9=12.9 · rift 1.5+1.6=3.1
                     var t=new SoulTraits{resilience=25,depth=5,predator=5,memory=0};
                     var w2=ScRegions.BirthWeights(t, 0, w.data);
-                    Check(Math.Abs(w2["quiet_cradle"]-34.8)<1e-9, "quiet_cradle weight drifted: "+w2["quiet_cradle"]);
+                    Check(Math.Abs(w2["quiet_cradle"]-42.8)<1e-9, "quiet_cradle weight drifted: "+w2["quiet_cradle"]);
                     Check(Math.Abs(w2["root_garden"]-27.5)<1e-9, "root_garden weight drifted: "+w2["root_garden"]);
                     Check(Math.Abs(w2["bone_narrows"]-13.1)<1e-9, "bone_narrows weight drifted: "+w2["bone_narrows"]);
                     Check(Math.Abs(w2["forgotten_vein"]-12.9)<1e-9, "forgotten_vein weight drifted: "+w2["forgotten_vein"]);
                     Check(Math.Abs(w2["soul_rift"]-3.1)<1e-9, "soul_rift weight drifted: "+w2["soul_rift"]);
-                    // Мир реагирует: сытый посёлок убирает штраф колыбели
-                    w.data.village.food=40; w.data.village.stability=70;
+                    // Мир реагирует: голодный посёлок штрафует колыбель (−8)
+                    w.data.village.food=12; w.data.village.stability=70;
                     var w3=ScRegions.BirthWeights(t, 0, w.data);
-                    Check(Math.Abs(w3["quiet_cradle"]-(26+0+(100-5)*0.18-5*0.06))<1e-9, "Village state ignored by weights");
+                    Check(Math.Abs(w3["quiet_cradle"]-(26+0+(100-5)*0.18-5*0.06-8))<1e-9, "Village state ignored by weights");
                     // Глубина ≥50 открывает Разлом бонусом
                     var deep=new SoulTraits{resilience=25,depth=50,predator=5,memory=0};
                     var w4=ScRegions.BirthWeights(deep, 0, w.data);
@@ -336,6 +364,435 @@ namespace ServerClosed.Validation
                     var bare=new WorldData();
                     ScSoul.EnsureMigration(bare);
                     Check(bare.soul.memories.Count==6 && bare.achievements.Count==16, "Bare WorldData not migrated");
+                    break; }
+                // ===== v1.3: полная игра =====
+                case "QuestAcceptTurnIn": {
+                    Surface(w);
+                    // задание «Три шкуры»: приём, ретро-прогресс, сдача
+                    Check(w.AcceptQuest("wolves"), "wolves quest refused");
+                    Check(!w.AcceptQuest("wolves"), "wolves quest accepted twice");
+                    var wolfC = w.data.creatures.Find(c => c.species == "wolf" && !c.dead);
+                    Check(wolfC != null, "No wolf in world");
+                    w.KillCreature(wolfC, "player");
+                    w.data.SetFlag("quest_progress_wolves", 3);   // ещё две добычи — прямо в счётчик
+                    Check(ScQuests.Status(w.data, ScQuests.ById("wolves")) == QuestStatus.Ready, "wolves not ready after 3 kills");
+                    double biomassBefore = w.data.player.biomass;
+                    double karmaBefore = w.data.karma;
+                    Check(w.TurnInQuest("wolves"), "wolves turn-in refused");
+                    Check(Math.Abs(w.data.player.biomass - (biomassBefore + 25)) < 1e-9, "wolves reward biomass wrong");
+                    Check(w.data.karma > karmaBefore, "wolves reward karma missing");
+                    Check(ScQuests.Done(w.data, "wolves") && w.data.wolfQuestDone == 1, "wolves done flags missing");
+                    Check(!w.TurnInQuest("wolves"), "wolves turned in twice");
+                    // прогресс пишет именно KillCreature: следующий квест-волк тоже считается
+                    Check(ScQuests.CompletedCount(w.data) == 1, "Completed count wrong");
+                    break; }
+                case "QuestRequiresChain": {
+                    Surface(w);
+                    Check(!w.AcceptQuest("monarch"), "monarch accepted without descend");
+                    Check(!w.AcceptQuest("shards"), "shards accepted without wolves");
+                    Check(w.AcceptQuest("descend"), "descend refused");
+                    Check(!w.AcceptQuest("monarch"), "monarch accepted before descend done");
+                    w.data.SetFlag("quest_progress_descend", 1);   // спуск уже был — мир помнит
+                    w.TurnInQuest("descend");
+                    Check(w.AcceptQuest("monarch"), "monarch refused after descend");
+                    w.data.SetFlag("quest_done_wolves", 1);
+                    Check(w.AcceptQuest("shards"), "shards refused after wolves done");
+                    break; }
+                case "QuestRetroactive": {
+                    Surface(w);
+                    // мир помнит подвиги: убитый вожак, вошедшее подземелье, убитые волки
+                    var wolfC = w.data.creatures.Find(c => c.species == "wolf" && !c.dead);
+                    w.KillCreature(wolfC, "player");
+                    w.data.flagWolvesKilled = 3;
+                    Check(w.AcceptQuest("wolves") && ScQuests.Progress(w.data, "wolves") == 3, "wolf kills not counted retroactively");
+                    Check(w.AcceptQuest("descend"), "descend accept failed");
+                    w.data.SetFlag("quest_progress_descend", 1);   // спуск уже был
+                    w.TurnInQuest("descend");
+                    w.data.monarchKilled = 1;   // босс был повержен ДО принятия (и поле, и флаг — как пишет KillCreature)
+                    w.data.SetFlag("monarchKilled", 1);
+                    Check(w.AcceptQuest("monarch"), "monarch accept failed");
+                    Check(ScQuests.Progress(w.data, "monarch") == 1, "boss kill not counted retroactively");
+                    break; }
+                case "QuestDonateProgress": {
+                    Surface(w);
+                    w.data.player.biomass = 50;
+                    Check(w.AcceptQuest("harvest"), "harvest refused");
+                    Check(w.DonateFood() && w.DonateFood(), "donations refused");
+                    Check(ScQuests.Progress(w.data, "harvest") == 2, "donate progress wrong");
+                    w.data.player.biomass = 10;
+                    w.DonateFood();
+                    Check(ScQuests.Progress(w.data, "harvest") == 3, "donate progress not complete");
+                    Check(w.TurnInQuest("harvest"), "harvest turn-in failed");
+                    Check(ScQuests.CompletedCount(w.data) == 1, "harvest not counted");
+                    break; }
+                case "SeasonRotationMods": {
+                    Check(ScSeasons.SeasonOf(0) == "Пробуждение" && ScSeasons.SeasonOf(5.9) == "Пробуждение", "Season 1 wrong");
+                    Check(ScSeasons.SeasonOf(6) == "Цветение" && ScSeasons.SeasonOf(12) == "Увядание" && ScSeasons.SeasonOf(18) == "Тьма", "Season order wrong");
+                    Check(ScSeasons.SeasonOf(24) == "Пробуждение", "Year wrap wrong");
+                    Check(Math.Abs(ScSeasons.Darkness.birthMul - 0.25) < 1e-9 && Math.Abs(ScSeasons.Darkness.aggressionAdd - 0.2) < 1e-9, "Darkness mods wrong");
+                    Check(Math.Abs(ScSeasons.Blossom.villageFoodDelta - 2) < 1e-9 && Math.Abs(ScSeasons.Withering.dietMul - 1.3) < 1e-9, "Season economy mods wrong");
+                    Check(!string.IsNullOrEmpty(ScSeasons.SeasonLog("Тьма")) && ScSeasons.MigrationsFor("Тьма").Count == 6, "Darkness log/migrations wrong");
+                    Check(ScSeasons.MigrationsFor("Цветение").Count == 0, "Blossom should not migrate");
+                    Check(Math.Abs(ScSeasons.SeasonalSpawnBoost("mushling", "Увядание") - 2.0) < 1e-9 && Math.Abs(ScSeasons.SeasonalSpawnBoost("wolf", "Цветение") - 1) < 1e-9, "Seasonal spawn boost wrong");
+                    break; }
+                case "SeasonVillageFoodDelta": {
+                    w = World(424242);   // свой сид: редкий бросок базовой смертности не должен ломать экономику теста
+                    Surface(w);
+                    // ставим мир в Цветение (день 6..11) и Тьму (18..23): формулы еды посёлка
+                    w.clock.minutes = 6 * 1440.0; w.data.minutes = w.clock.minutes;   // первый день Цветения
+                    w.data.village.food = 40; w.data.village.population = 11;
+                    TickDay(w);
+                    Check(w.data.deathCause == null, "Player died from baseline mortality in test (seed 424242)");
+                    // food = 40 + 3 + stage(11→Деревня=1) − ceil(11*0.4)=5 + Цветение(+2) = 41
+                    Check(Math.Abs(w.data.village.food - 41) < 1e-9, "Blossom food delta wrong: " + w.data.village.food);
+                    w.clock.minutes = 18 * 1440.0; w.data.minutes = w.clock.minutes;   // Тьма
+                    TickDay(w);
+                    // 41 + 3 + 1 − 5 − 2 = 38 (Тьма −2)
+                    Check(Math.Abs(w.data.village.food - 38) < 1e-9, "Darkness food delta wrong: " + w.data.village.food);
+                    break; }
+                case "SeasonMigrationsMove": {
+                    w = World(424243);   // свой сид против редкой базовой смертности
+                    Surface(w);
+                    // волки уже есть в мире (стартовый план); смена сезона на Тьму тянет их к посёлку
+                    var wolves = w.data.creatures.FindAll(c => c.species == "wolf" && !c.dead);
+                    Check(wolves.Count >= 1, "No wolves to migrate");
+                    w.data.creatures.RemoveAll(c => c.species != "wolf" || c.dead);   // только волки — чистый эксперимент
+                    TickDay(w);   // первый тик лишь фиксирует текущий сезон (как в вебе: lastSeason null)
+                    w.clock.minutes = 18 * 1440.0; w.data.minutes = w.clock.minutes;   // наступает Тьма
+                    TickDay(w);
+                    Check(w.data.deathCause == null, "Player died from baseline mortality in test");
+                    var vil = w.data.Poi("village");
+                    var migrated = w.data.creatures.FindAll(c => c.species == "wolf" && c.hasHome);
+                    Check(migrated.Count >= 1, "Wolves did not get migration homes");
+                    foreach (var mw in migrated)
+                        Check(ScRng.Dist(mw.homeX, mw.homeY, vil.x, vil.y) < vil.r + 2, "Wolf migrated away from village");
+                    Check(w.data.log.Exists(l => l.text.StartsWith("Зверь смещается")), "Migration chronicle missing");
+                    break; }
+                case "SeasonNeutralInDungeon": {
+                    Surface(w);
+                    Check(Math.Abs(w.SeasonMods.birthMul - ScSeasons.Mods(w.Season).birthMul) < 1e-9, "Surface mods wrong");
+                    w.EnterBirthNest();
+                    Check(Math.Abs(w.SeasonMods.birthMul - 1) < 1e-9 && Math.Abs(w.SeasonMods.villageFoodDelta) < 1e-9, "Nest is not season-neutral");
+                    var nf = w.Dun.floors[0];
+                    w.data.player.x = nf.upX; w.data.player.y = nf.upY;
+                    Check(w.ExitBirthNest(), "Second exit from nest refused");
+                    w.InvalidateSeasonCache();
+                    Check(w.SeasonMods.hint == ScSeasons.Mods(w.Season).hint, "Surface seasons did not resume after nest");
+                    break; }
+                case "VillageStageEconomy": {
+                    string st1; double fb1; ScQuests.VillageStageOf(9, out st1, out fb1);
+                    string st2; double fb2; ScQuests.VillageStageOf(11, out st2, out fb2);
+                    string st3; double fb3; ScQuests.VillageStageOf(17, out st3, out fb3);
+                    Check(st1 == "Хутор" && fb1 == 0 && st2 == "Деревня" && fb2 == 1 && st3 == "Посад" && fb3 == 2, "Village stage thresholds wrong");
+                    Check(w.data.village.population == 11 && w.data.village.food == 40 && w.data.village.military == 25, "Village new-game defaults wrong (web parity)");
+                    Surface(w);
+                    TickDay(w);
+                    Check(w.data.deathCause == null, "Player died from baseline mortality in test");
+                    Check(w.data.village.stage == "Деревня", "Stage not applied after day tick");
+                    break; }
+                case "RaidCycleIgnored": {
+                    w = World(424244);   // свой сид против редкой базовой смертности
+                    Surface(w);
+                    // стая у ограды (порог wolves>=4 и шанс 0.4 — формула; здесь — детерминированное расписание)
+                    for (int i = 0; i < 4; i++)
+                        w.SpawnCreature("wolf", Vec.Of(w.data.Poi("burrow").x + i * 0.5, w.data.Poi("burrow").y), 1);
+                    w.data.village.raidPending = true;
+                    w.data.village.raidDeadline = w.clock.TotalDays + 1;
+                    TickDay(w);   // волки подходят к ограде
+                    Check(w.data.village.raidPending, "Raid vanished before deadline");
+                    double food0 = w.data.village.food; int pop0 = w.data.village.population; double stab0 = w.data.village.stability;
+                    w.data.village.raidDeadline = w.clock.TotalDays;   // срок вышел
+                    TickDay(w);
+                    Check(w.data.deathCause == null, "Player died from baseline mortality in test");
+                    Check(!w.data.village.raidPending, "Raid still pending after deadline");
+                    Check(w.data.village.food <= food0 - 16 + 1e-9, "Ignored raid: food penalty missing");
+                    Check(w.data.village.population <= pop0 - 2, "Ignored raid: population loss missing");
+                    Check(w.data.village.stability < stab0, "Ignored raid: stability penalty missing");
+                    Check(w.data.karmaEvents.Exists(k => k.id == "ignored_raid") && Math.Abs(w.data.karmaTotal + 10) < 1e-9, "Ignored raid karma missing");
+                    break; }
+                case "RaidDefenseChess": {
+                    Surface(w);
+                    var stChess = ScChess.CreateRaidChess(w);
+                    Check(stChess.phase == "setup" && stChess.boardR == 5 && stChess.boardC == 7, "Chess board wrong");
+                    Check(stChess.enemies.Count == 3, "Raid 1 wolf pack wrong");   // 2 волка + вожак
+                    Check(stChess.reserveLimit == 3, "Reserve limit for military 25 wrong");
+                    // победный сценарий: врагам по 1 HP, выставляем полный состав
+                    foreach (var e in stChess.enemies) e.hp = 1;
+                    Check(ScChess.Place(stChess, "cmdr", 3, 1), "cmdr place refused");
+                    Check(ScChess.Place(stChess, "militia", 3, 3), "militia place refused");
+                    Check(ScChess.Place(stChess, "archer", 4, 5), "archer place refused");
+                    Check(!ScChess.Place(stChess, "militia", 2, 0), "placed into enemy rows");
+                    Check(!ScChess.Place(stChess, "ghost", 4, 0), "unknown unit accepted");
+                    ScChess.Start(stChess);
+                    var brng = new ScRng(777);
+                    int guard = 0;
+                    while (stChess.phase == "battle" && guard++ < 700) ScChess.Tick(stChess, brng);
+                    Check(stChess.phase == "result" && stChess.result == "win", "Rigged battle did not win");
+                    Check(stChess.worldMinutesSpent > 0, "World minutes not consumed");
+                    int wolves0 = w.data.creatures.FindAll(c => c.species == "wolf" && !c.dead).Count;
+                    ScChess.ApplyResult(w, stChess);
+                    Check(Math.Abs(w.data.village.military - 33) < 1e-9 && Math.Abs(w.data.village.stability - 68) < 1e-9, "Win effects on village wrong");
+                    Check(w.data.village.raidsSurvived == 1 && w.data.raidDefended == 1, "Raid defense flags missing");
+                    Check(Math.Abs(w.Npc("dar").attitude - 59) < 1e-9, "Dar attitude +14 missing");
+                    Check(w.data.karmaEvents.Exists(k => k.id == "raid_defended"), "Raid defense karma missing");
+                    Check(w.data.soul != null && w.data.soul.memories.Exists(mm => mm.id == "m_chess"), "chess memory check needs raid flag"); // m_chess откроется судом при raidDefended
+                    break; }
+                case "ChessRulesSetup": {
+                    var stChess = ScChess.CreateRaidChess(w);
+                    Check(ScChess.Place(stChess, "militia", 3, 3), "first place refused");
+                    // перестановка существующей фигуры не расходует лимит
+                    Check(ScChess.Place(stChess, "militia", 4, 3), "re-place refused");
+                    Check(stChess.placed.Count == 1, "Re-place duplicated unit");
+                    ScChess.Remove(stChess, stChess.placed[0].uid);
+                    Check(stChess.placed.Count == 0, "Remove failed");
+                    ScChess.Start(stChess);   // пустой состав — бой не начинается
+                    Check(stChess.phase == "setup", "Battle started without units");
+                    // проигрышный сценарий: одиночный боец с 1 HP против стаи
+                    Check(ScChess.Place(stChess, "militia", 3, 3), "militia place refused");
+                    stChess.placed[0].hp = 1;
+                    ScChess.Start(stChess);
+                    Check(stChess.phase == "battle", "Battle with units did not start");
+                    var brng = new ScRng(4242);
+                    int guard = 0;
+                    while (stChess.phase == "battle" && guard++ < 700) ScChess.Tick(stChess, brng);
+                    Check(stChess.phase == "result" && stChess.result == "lose", "Rigged battle did not lose");
+                    double food0 = w.data.village.food; int pop0 = w.data.village.population;
+                    ScChess.ApplyResult(w, stChess);
+                    Check(w.data.village.food <= food0 - 14 + 1e-9 && w.data.village.population <= pop0 - 2, "Lose effects missing");
+                    Check(w.data.karmaEvents.Exists(k => k.id == "raid_failed"), "Lose karma missing");
+                    break; }
+                case "NpcDialogueOptions": {
+                    Surface(w);
+                    // Мирра (старейшина): опции квестов, Разлом, уход
+                    var mirra = ScNpcs.Dialogue(w, "mirra");
+                    Check(mirra.options.Exists(o => o.id == "ask_rift") && mirra.options.Exists(o => o.id == "leave"), "Mirra base options wrong");
+                    Check(mirra.options.Exists(o => o.id == "accept_descend"), "Mirra does not offer descend");
+                    Check(w.AcceptQuest("descend"), "descend accept failed");
+                    mirra = ScNpcs.Dialogue(w, "mirra");
+                    Check(!mirra.options.Exists(o => o.id == "accept_descend"), "Mirra re-offers active quest");
+                    w.data.SetFlag("quest_progress_descend", 1);
+                    mirra = ScNpcs.Dialogue(w, "mirra");
+                    Check(mirra.options.Exists(o => o.id == "turnin_descend"), "Mirra does not take ready quest");
+                    // Дар при набеге: Magic Chess и охота на вожака
+                    w.data.village.raidPending = true;
+                    var dar = ScNpcs.Dialogue(w, "dar");
+                    Check(dar.options.Exists(o => o.id == "start_raid") && dar.options.Exists(o => o.id == "hunt_alpha"), "Dar raid options wrong");
+                    ScNpcs.Action(w, "dar", "hunt_alpha");
+                    Check(w.data.Flag("alphaSpawned") == 1 && w.data.creatures.Exists(c => c.questTag == "alpha" && c.name == "Рваное Ухо"), "Alpha hunt spawn wrong");
+                    ScNpcs.Action(w, "dar", "start_raid");
+                    Check(w.ConsumeStartRaid(), "startRaid flag not consumed");
+                    w.data.village.raidPending = false;
+                    // Клумба: donate/steal/спросить о духах
+                    var klumba = ScNpcs.Dialogue(w, "klumba");
+                    Check(klumba.options.Exists(o => o.id == "donate") && klumba.options.Exists(o => o.id == "steal") && klumba.options.Exists(o => o.id == "ask_spirits"), "Klumba options wrong");
+                    ScNpcs.Action(w, "klumba", "ask_spirits");
+                    Check(w.data.Flag("showStoneCircle") == 1, "Spirits flag missing");
+                    ScNpcs.Action(w, "mirra", "ask_rift");
+                    Check(w.data.loreRift == 1, "Lore rift counter missing");
+                    break; }
+                case "DonateStealFood": {
+                    Surface(w);
+                    w.data.player.biomass = 15;
+                    double dar0 = w.Npc("dar").attitude; double karma0 = w.data.karmaTotal;
+                    Check(w.DonateFood(), "Donate refused");
+                    Check(Math.Abs(w.data.village.food - 52) < 1e-9, "Donate food +12 wrong");
+                    Check(Math.Abs(w.data.village.stability - 62) < 1e-9, "Donate stability +2 wrong");
+                    Check(Math.Abs(w.Npc("dar").attitude - (dar0 + 5)) < 1e-9, "Donate attitude +5 wrong");
+                    Check(w.data.donateCount == 1 && w.data.karmaTotal > karma0, "Donate karma/count missing");
+                    Check(Math.Abs(w.data.player.biomass - 5) < 1e-9, "Donate biomass cost wrong");
+                    Check(!w.DonateFood(), "Donate allowed without biomass");
+                    Check(w.StealFood(), "Steal refused");
+                    Check(Math.Abs(w.data.village.food - 42) < 1e-9 && Math.Abs(w.data.village.stability - 59) < 1e-9, "Steal economics wrong");
+                    Check(w.data.karmaTotal < karma0 + 6, "Steal karma penalty missing");
+                    Check(!w.StealFood(), "Steal twice in one day");
+                    break; }
+                case "NpcSuccession": {
+                    Surface(w);
+                    var mirra = w.Npc("mirra");
+                    mirra.ageDays = 481;   // lifespan 480 — смертность ~13%/день и растёт
+                    int guard = 0;
+                    while (w.Npc("ivo") == null && guard++ < 400) TickDay(w);
+                    Check(!mirra.alive, "Old mirra never died");
+                    Check(w.Npc("ivo") != null && w.Npc("ivo").role == "новый старейшина", "Successor ivo missing");
+                    Check(w.data.log.Exists(l => l.text.Contains("Иво")), "Succession chronicle missing");
+                    // преемники остальных жителей
+                    var dar = w.Npc("dar"); dar.ageDays = 999; dar.alive = true;
+                    var klumba = w.Npc("klumba"); klumba.ageDays = 999; klumba.alive = true;
+                    guard = 0;
+                    while ((w.Npc("rinsa") == null || w.Npc("prokh") == null) && guard++ < 400) TickDay(w);
+                    Check(w.Npc("rinsa") != null && w.Npc("prokh") != null, "Dar/Klumba successors missing");
+                    break; }
+                case "DungeonCatacombsPort": {
+                    Surface(w);
+                    Check(w.AcceptQuest("descend"), "descend accept failed");   // крючок задания до входа
+                    var gate = ScDungeon.Catacombs.gatePos(w.data);
+                    var pcat = w.data.player;
+                    pcat.x = (float)gate.x; pcat.y = (float)gate.y; pcat.vx = 0; pcat.vy = 0;
+                    w.UpdateProximity();
+                    Check(w.nearGateId == "catacombs", "Gate proximity not detected");
+                    Check(w.EnterDungeon("catacombs"), "Enter catacombs refused");
+                    Check(w.DungeonActive && w.data.activeDungeon == "catacombs", "Dungeon state wrong");
+                    var dun = w.Dun;
+                    Check(dun.floors.Count == 3 && dun.floors[0].w == 22 && dun.floors[0].h == 22, "Catacombs floors wrong");
+                    int sporelings = 0, mycenoids = 0;
+                    foreach (var c in w.ActiveCreatures()) { if (c.species == "sporeling") sporelings++; if (c.species == "mycenoid") mycenoids++; }
+                    Check(sporelings == 4 && mycenoids == 1, "Depth 1 spawn plan wrong");
+                    Check(w.data.dungeonEntered == 1 && ScQuests.Progress(w.data, "descend") == 1, "Dungeon enter hooks missing");
+                    // вниз до третьей глубины — к Монарху (переход по лестницам вниз)
+                    var f0 = dun.floors[0];
+                    pcat.x = f0.downX + 0.4f; pcat.y = f0.downY + 0.4f;
+                    Check(w.DescendStairs() && w.Dun.depth == 2, "Descend to depth 2 refused");
+                    var f1 = dun.floors[1];
+                    pcat.x = f1.downX + 0.4f; pcat.y = f1.downY + 0.4f;
+                    Check(w.DescendStairs() && w.Dun.depth == 3, "Descend to depth 3 refused");
+                    var boss = w.ActiveCreatures().Find(c => c.species == "myco_monarch");
+                    Check(boss != null && boss.questTag == "monarch" && boss.name == "Грибной Монарх", "Monarch not spawned at depth 3");
+                    double biomass0 = w.data.player.biomass;
+                    w.KillCreature(boss, "player");
+                    Check(w.data.monarchKilled == 1 && w.data.Flag("monarchKilled") == 1, "Monarch kill flags missing");
+                    Check(Math.Abs(w.data.player.biomass - (biomass0 + 30)) < 1e-9, "Boss reward biomass wrong");
+                    Check(w.data.player.knownGenes.Contains("bioluminescent"), "Boss trophy gene missing");
+                    Check(w.data.creatures.Exists(c => c.species == "mycenoid"), "After-boss plan missing");
+                    // ретро-прогресс и сдача цепочки заданий
+                    w.data.SetFlag("quest_done_descend", 1);
+                    Check(w.AcceptQuest("monarch") && ScQuests.Progress(w.data, "monarch") == 1, "Monarch quest not retroactive");
+                    Check(w.TurnInQuest("monarch"), "Monarch turn-in failed");
+                    // наверх — по лестницам вверх (у каждой — точка up своего этажа)
+                    var f2 = dun.floors[2];
+                    Check(w.AscendStairs() && w.Dun.depth == 2, "Ascent to depth 2 refused");   // стояли у up глубины 3
+                    pcat.x = f1.upX + 0.4f; pcat.y = f1.upY + 0.4f;
+                    Check(w.AscendStairs() && w.Dun.depth == 1, "Ascent to depth 1 refused");
+                    pcat.x = f0.upX + 0.4f; pcat.y = f0.upY + 0.4f;
+                    Check(w.AscendStairs() && !w.DungeonActive && w.data.activeDungeon == null, "Surface exit failed");
+                    break; }
+                case "DungeonStairsCache": {
+                    Surface(w);
+                    var gate = ScDungeon.UndergroundChannel.gatePos(w.data);
+                    var pch = w.data.player;
+                    pch.x = (float)gate.x; pch.y = (float)gate.y; pch.vx = 0; pch.vy = 0;
+                    Check(w.EnterDungeon("underground_channel"), "Enter channel refused");
+                    var dun = w.Dun;
+                    Check(dun.floors.Count == 2, "Channel depths wrong");
+                    Check(dun.caches.Count > 0, "No caches placed");
+                    // принос: у первого не взятого тайника текущей глубины
+                    var cache = dun.caches.Find(cc => cc.depth == dun.depth && !cc.taken);
+                    Check(cache != null, "Cache for depth 1 missing");
+                    double biomass0 = w.data.player.biomass;
+                    pch.x = cache.x + 0.1f; pch.y = cache.y + 0.1f;
+                    w.UpdateProximity();
+                    Check(w.nearCacheId == cache.id, "Cache proximity missed");
+                    Check(w.TakeCache(), "Take cache failed");
+                    Check(cache.taken && w.data.player.biomass > biomass0, "Cache reward missing");
+                    Check(!w.TakeCache(), "Cache taken twice");
+                    // лестница вниз/вверх по координатам этажа
+                    var f1 = dun.floors[0];
+                    pch.x = f1.downX + 0.4f; pch.y = f1.downY + 0.4f;
+                    w.UpdateProximity();
+                    Check(w.nearStairsDown, "Stairs-down proximity missed");
+                    Check(w.DescendStairs() && w.Dun.depth == 2, "Descend failed");
+                    var f2 = dun.floors[1];
+                    pch.x = f2.upX + 0.4f; pch.y = f2.upY + 0.4f;
+                    w.UpdateProximity();
+                    Check(w.nearStairsUp, "Stairs-up proximity missed");
+                    Check(w.AscendStairs() && w.Dun.depth == 1, "Ascend failed");
+                    pch.x = f1.upX + 0.4f; pch.y = f1.upY + 0.4f;
+                    Check(w.AscendStairs() && !w.DungeonActive, "Exit to surface failed");
+                    break; }
+                case "AtlasDiscoveryFlow": {
+                    Check(ScAtlas.RegionAt(26, 24).id == "forest_edge" && ScAtlas.RegionAt(45, 45).id == "soul_rift" && ScAtlas.RegionAt(26, 5).id == "echo_ridge", "RegionAt anchors wrong");
+                    Check(ScAtlas.DungeonRegionId("catacombs") == "root_garden" && ScAtlas.DungeonRegionId("crystal_caves") == "forgotten_vein" && ScAtlas.DungeonRegionId("birth_nest") == "quiet_cradle", "DungeonRegionId wrong");
+                    Check(ScAtlas.ById("rift_heart").sealedArea && ScAtlas.ById("echo_archive").sealedArea, "Depth regions not sealed");
+                    Check(ScAtlas.AllRegions.Length == 18, "World regions count wrong");
+                    // норка — подземный слой: её регион открывается раньше поверхности (как в вебе)
+                    w.Update(0.02, "explore");
+                    Check(w.IsRegionDiscovered("quiet_cradle"), "Nest region not discovered in nest");
+                    Surface(w);
+                    w.Update(0.02, "explore");
+                    Check(w.IsRegionDiscovered("forest_edge"), "Home region not discovered at start");
+                    Check(!w.IsRegionDiscovered("sunken_ruins"), "Ruins pre-discovered");
+                    Warp(w, 13.5, 17.5);
+                    w.Update(0.02, "explore");
+                    Check(w.IsRegionDiscovered("sunken_ruins") && w.ConsumeRegionDiscovery() == "sunken_ruins", "Ruins not discovered on visit");
+                    Check(w.ConsumeRegionDiscovery() == null, "Discovery consumed twice");
+                    // подземелье открывает свой подземный регион
+                    var gate = ScDungeon.Catacombs.gatePos(w.data);
+                    var pdr = w.data.player;
+                    pdr.x = (float)gate.x; pdr.y = (float)gate.y; pdr.vx = 0; pdr.vy = 0;
+                    w.EnterDungeon("catacombs");
+                    w.Update(0.02, "explore");
+                    Check(w.IsRegionDiscovered("root_garden"), "Underground region not discovered in dungeon");
+                    break; }
+                case "CrackSmallBodyOnly": {
+                    Surface(w);
+                    // трещина засеяна: декор-вход и добыча в кармане
+                    Check(w.data.mapJson.deco.Exists(dc => dc.kind == "crack"), "Crack deco not seeded");
+                    Check(w.data.creatures.Exists(c => c.dungeonFloor == 0 && Math.Abs(c.x - 34) < 2 && Math.Abs(c.y - 31) < 2), "Crack pocket prey missing");
+                    // малое тело (0 генов) проскальзывает внутрь кармана
+                    Warp(w, 34, 31.5);
+                    Check(w.IsWalkable(34, 31.5), "Small body blocked by crack");
+                    // взрослое тело (2 гена) не пролезает, хроника подсказывает
+                    w.data.player.biomass = 100;
+                    Check(w.InstallGene("slime_coat") && w.InstallGene("sensors"), "Gene install for crack test failed");
+                    int logs0 = w.data.log.Count;
+                    Check(!w.IsWalkable(34, 31.5), "Adult body slipped through crack");
+                    Check(w.data.log.Count > logs0 && w.data.log[w.data.log.Count - 1].text.Contains("Трещина слишком узка"), "Crack hint log missing");
+                    break; }
+                case "KarmaPathThresholds": {
+                    w.data.karmaTotal = 41;
+                    Check(w.KarmaPath() == "Свет", "Karma +41 is not Свет");
+                    w.data.karmaTotal = -41;
+                    Check(w.KarmaPath() == "Тьма", "Karma −41 is not Тьма");
+                    w.data.karmaTotal = 0;
+                    Check(w.KarmaPath() == "Равновесие", "Karma 0 is not Равновесие");
+                    // Путь Света: ежедневное подношение посёлку и телу
+                    Surface(w);
+                    w.data.soul.karma = 50;   // итог души + ведомость жизни ≥ 40
+                    double food0 = w.data.village.food; double biomass0 = w.data.player.biomass;
+                    TickDay(w);
+                    Check(w.data.Flag("lightBlessing") == 1, "Light blessing flag missing");
+                    Check(w.data.player.biomass > biomass0, "Light blessing biomass missing");
+                    Check(w.data.village.food > food0, "Light blessing village food missing");
+                    break; }
+                case "WorldV13Roundtrip": {
+                    Surface(w);
+                    w.data.SetFlag("quest_accepted_wolves", 1);
+                    w.data.SetFlag("quest_progress_wolves", 2);
+                    w.data.worldRegions["sunken_ruins"] = 1;
+                    w.data.village.raidPending = true;
+                    w.data.village.raidDeadline = 42;
+                    w.data.npcs[0].attitude = 77;
+                    var stChess = ScChess.CreateRaidChess(w);
+                    ScChess.Place(stChess, "cmdr", 3, 2);
+                    w.data.chess = stChess;
+                    w.CaptureState();
+                    string json13 = ScJson.ToJson(w.data);
+                    var restored13 = ScJson.FromJson<WorldData>(json13);
+                    Check(ScJson.ToJson(restored13) == json13, "v1.3 world changed on roundtrip");
+                    Check(restored13.npcs.Count == w.data.npcs.Count && restored13.npcs[0].attitude == 77, "NPCs lost on roundtrip");
+                    Check(restored13.Flag("quest_progress_wolves") == 2, "Quest flags lost on roundtrip");
+                    Check(restored13.worldRegions.ContainsValue(1) && restored13.worldRegions.ContainsKey("sunken_ruins"), "Atlas discovery lost on roundtrip");
+                    Check(restored13.chess != null && restored13.chess.placed.Count == 1 && restored13.chess.placed[0].defId == "cmdr", "Chess state lost on roundtrip");
+                    Check(restored13.village.raidPending && restored13.village.raidDeadline == 42, "Raid state lost on roundtrip");
+                    ScWorld.FromData(restored13).Update(0.02, "explore");
+                    break; }
+                case "JudgmentBodyChoice": {
+                    w.KillPlayer("old_age", "тест тел");
+                    Check(w.data.soul.level == 1, "Soul should be level 1");
+                    var opts = ScSoul.ReincarnationOptions(w.data.soul);
+                    Check(opts.Count == 1 && opts[0].id == "slug", "Level 1 should offer only base slug");
+                    w.data.soul.level = 3;   // душе открыт выбор расширенных тел
+                    w.data.soul.stats.will = 3;   // волевая душа заслужила тело волчьей крови
+                    opts = ScSoul.ReincarnationOptions(w.data.soul);
+                    Check(opts.Exists(o => o.id == "light_slug") && opts.Exists(o => o.id == "wolfblood_slug"), "Reincarnation options missing");
+                    Check(w.ReincarnateWith("light_slug"), "ReincarnateWith refused");
+                    Check(Math.Abs(w.data.player.bonusMaxHp - 4) < 1e-9 && Math.Abs(w.data.player.bonusPerception - 20) < 1e-9, "light_slug body gifts missing");
+                    Check(w.data.player.perks.Contains("spirit_resonance"), "light_slug perk missing");
+                    w.KillPlayer("killed", "тест тел 2");
+                    w.data.soul.level = 3;
+                    w.data.soul.stats.will = 3;   // суд пересчитал уровень — выбор остаётся за душой
+                    Check(w.ReincarnateWith("wolfblood_slug"), "Second reincarnation refused");
+                    Check(Math.Abs(w.data.player.bonusAtk - 1) < 1e-9 && Math.Abs(w.data.player.bonusSpeed - 0.2) < 1e-9, "wolfblood body gifts missing");
+                    Check(w.data.player.perks.Contains("hunter_instinct"), "wolfblood perk missing");
                     break; }
                 default: throw new ArgumentException(name);
             }
