@@ -40,3 +40,27 @@ Thumbs.db
 
 # Rider
 .idea/
+
+# Local development caches, builds and credentials
+**/node_modules/
+**/.next/
+**/out/
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+**/[Oo]bj/
+**/[Bb]uilds/
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+*.apk
+*.aab
+serverclosed_save*
+sc_save*.json

@@ -1,0 +1,5 @@
+{
+  "name": "ServerClosed.Port.Editor",
+  "references": ["ServerClosed.Port.Core", "ServerClosed.Port.Runtime", "Unity.InputSystem"],
+  "includePlatforms": ["Editor"]
+}

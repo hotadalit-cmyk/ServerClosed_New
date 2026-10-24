@@ -1,0 +1,4 @@
+<linker>
+  <assembly fullname="ServerClosed.Port.Core" preserve="all" />
+  <assembly fullname="ServerClosed.Port.Runtime" preserve="all" />
+</linker>

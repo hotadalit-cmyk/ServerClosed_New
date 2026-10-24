@@ -1,0 +1,6 @@
+{
+  "name": "ServerClosed.Port.Core",
+  "rootNamespace": "ServerClosed.Core",
+  "references": [],
+  "noEngineReferences": true
+}

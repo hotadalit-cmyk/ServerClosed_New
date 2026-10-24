@@ -1,0 +1,6 @@
+{
+  "name": "ServerClosed.Port.Tests",
+  "references": ["ServerClosed.Port.Core", "ServerClosed.Port.Runtime", "ServerClosed.Port.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

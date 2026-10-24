@@ -1,0 +1,3 @@
+* text=auto
+[attr]unity-json text eol=lf linguist-language=json
+[attr]unity-yaml text eol=lf linguist-language=yaml

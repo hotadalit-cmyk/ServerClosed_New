@@ -1,0 +1,5 @@
+{
+  "name": "ServerClosed.Port.Runtime",
+  "rootNamespace": "ServerClosed.Runtime",
+  "references": ["ServerClosed.Port.Core", "Unity.InputSystem"]
+}
