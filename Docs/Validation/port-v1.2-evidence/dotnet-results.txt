@@ -1,0 +1,32 @@
+SERVERCLOSED regression suite (.NET 10.0.13)
+PASS SeedDeterminism
+PASS MissingSenseMultiplier
+PASS PartialSenseMultiplier
+PASS DigestionExactlyOnce
+PASS NestCombatExit
+PASS SaveRoundtrip
+PASS RngContinuation
+PASS DayCounterContinuation
+PASS PausedWorld
+PASS DeadBodyCommands
+PASS ReincarnationKeepsWorld
+PASS RepairInvalidPosition
+PASS SaveFallback
+PASS CorruptSaveRejected
+PASS MalformedJsonRejected
+PASS SprintSpeed
+PASS VisionExploresMap
+PASS FogHidesDistantEntities
+PASS SimulationSoak
+PASS SoulNewGameDefaults
+PASS SoulLevelThresholds
+PASS RegionWeightFormula
+PASS RegionRollDeterminism
+PASS JudgmentAppliesOnce
+PASS JudgmentOldAgeUnlocks
+PASS ReincarnationRegionBirth
+PASS SoulSaveRoundtrip
+PASS RegionHazards
+PASS WorldAdvanceAfterDeath
+PASS OldSaveMigration
+Итого: 30/30 PASS
