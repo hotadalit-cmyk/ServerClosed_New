@@ -1,0 +1,69 @@
+PASS SeedDeterminism
+PASS MissingSenseMultiplier
+PASS PartialSenseMultiplier
+PASS DigestionExactlyOnce
+PASS NestCombatExit
+PASS SaveRoundtrip
+PASS RngContinuation
+PASS DayCounterContinuation
+PASS PausedWorld
+PASS DeadBodyCommands
+PASS ReincarnationKeepsWorld
+PASS RepairInvalidPosition
+PASS SaveFallback
+PASS CorruptSaveRejected
+PASS MalformedJsonRejected
+PASS SprintSpeed
+PASS VisionExploresMap
+PASS FogHidesDistantEntities
+PASS SimulationSoak
+PASS SoulNewGameDefaults
+PASS SoulLevelThresholds
+PASS RegionWeightFormula
+PASS RegionRollDeterminism
+PASS JudgmentAppliesOnce
+PASS JudgmentOldAgeUnlocks
+PASS ReincarnationRegionBirth
+PASS SoulSaveRoundtrip
+PASS RegionHazards
+PASS WorldAdvanceAfterDeath
+PASS OldSaveMigration
+PASS QuestAcceptTurnIn
+PASS QuestRequiresChain
+PASS QuestRetroactive
+PASS QuestDonateProgress
+PASS SeasonRotationMods
+PASS SeasonVillageFoodDelta
+PASS SeasonMigrationsMove
+PASS SeasonNeutralInDungeon
+PASS VillageStageEconomy
+PASS RaidCycleIgnored
+PASS RaidDefenseChess
+PASS ChessRulesSetup
+PASS NpcDialogueOptions
+PASS DonateStealFood
+PASS NpcSuccession
+PASS DungeonCatacombsPort
+PASS DungeonStairsCache
+PASS AtlasDiscoveryFlow
+PASS CrackSmallBodyOnly
+PASS KarmaPathThresholds
+PASS WorldV13Roundtrip
+PASS JudgmentBodyChoice
+FAIL ChessPlacementBounds System.Exception: Unit placed outside board
+   at ServerClosed.Validation.ScRegressionChecks.Check(Boolean value, String message) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 11
+   at ServerClosed.Validation.ScRegressionChecks.Run(String name) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 800
+   at Program.Main() in C:\Users\Химия\.codex\.chatgpt-projects\g-p-6ad0aeab45b481918599d4179b26500a\ServerClosed-v13\Checks\Program.cs:line 4
+FAIL ChessResultOnce System.Exception: Raid rewards applied twice
+   at ServerClosed.Validation.ScRegressionChecks.Check(Boolean value, String message) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 11
+   at ServerClosed.Validation.ScRegressionChecks.Run(String name) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 806
+   at Program.Main() in C:\Users\Химия\.codex\.chatgpt-projects\g-p-6ad0aeab45b481918599d4179b26500a\ServerClosed-v13\Checks\Program.cs:line 4
+FAIL ChessSaveContinuation System.Exception: Save/reload changed chess battle outcome or RNG
+   at ServerClosed.Validation.ScRegressionChecks.Check(Boolean value, String message) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 11
+   at ServerClosed.Validation.ScRegressionChecks.Run(String name) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 816
+   at Program.Main() in C:\Users\Химия\.codex\.chatgpt-projects\g-p-6ad0aeab45b481918599d4179b26500a\ServerClosed-v13\Checks\Program.cs:line 4
+FAIL ChessSetupDeterminism System.Exception: Global unit counter breaks deterministic setup
+   at ServerClosed.Validation.ScRegressionChecks.Check(Boolean value, String message) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 11
+   at ServerClosed.Validation.ScRegressionChecks.Run(String name) in C:\UnityProjects\ServerClosed_New\Game1\Assets\ServerClosed\Editor\ScRegressionChecks.cs:line 821
+   at Program.Main() in C:\Users\Химия\.codex\.chatgpt-projects\g-p-6ad0aeab45b481918599d4179b26500a\ServerClosed-v13\Checks\Program.cs:line 4
+TOTAL 56 FAILED 4

@@ -1,0 +1,12 @@
+dungeon-birth_nest-1
+dialog-dar
+chess-setup
+chess-battle
+chess-result
+life
+dungeon-catacombs-1
+dungeon-catacombs-2
+dungeon-catacombs-3
+judgment
+reincarnation
+dungeon-birth_nest-1

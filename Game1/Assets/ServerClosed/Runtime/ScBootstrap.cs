@@ -32,7 +32,16 @@ namespace ServerClosed.Runtime
         float UiHeight { get { return Screen.height / UiScale; } }
         public bool HudWasDrawn { get; private set; }
         public ScWorld World { get { return world; } }
+        string cameraLayer;
+        public bool IsModalOpen { get { return inChess || dialogNpc!=null || (world!=null && world.data.deathCause!=null); } }
         public bool validationMode;
+        public string ReviewPhase { get {
+            if(world==null) return "loading";
+            if(inChess) return "chess-"+(world.data.chess!=null?world.data.chess.phase:"none");
+            if(world.data.deathCause!=null) return deathStage==0?"judgment":"reincarnation";
+            if(dialogNpc!=null) return "dialog-"+dialogNpc;
+            return world.DungeonActive?"dungeon-"+world.data.activeDungeon+"-"+world.Dun.depth:"life";
+        } }
         void OnApplicationPause(bool paused) { if (paused && world != null && !validationMode) { world.CaptureState(); ScSave.Save(world.data); } }
         void OnApplicationQuit() { if (world != null && !validationMode) { world.CaptureState(); ScSave.Save(world.data); } }
 
@@ -58,6 +67,7 @@ namespace ServerClosed.Runtime
             }
             if (world == null) NewGame();
             view.world = world;
+            RestoreChess();
             cam.transform.position = view.PosToWorld(world.data.player.x, world.data.player.y) + new Vector3(0, 0.4f, -10);
             Toast("Вы — слизень. Вы слепы: мир познаётся осязанием. Поглощайте жизни.", 6);
         }
@@ -100,7 +110,11 @@ namespace ServerClosed.Runtime
             var p = world.data.player;
             var target = view.PosToWorld(p.x, p.y);
             var cam = view.cam;
-            cam.transform.position = Vector3.Lerp(cam.transform.position, target + new Vector3(0, 0.4f, -10), Mathf.Min(1, Time.deltaTime * 7));
+            var desiredCamera=target+new Vector3(0,0.4f,-10);
+            string layer=world.data.activeDungeon+":"+(world.DungeonActive?world.Dun.depth:0);
+            if(cameraLayer!=layer || Vector3.Distance(cam.transform.position,desiredCamera)>6) cam.transform.position=desiredCamera;
+            else cam.transform.position=Vector3.Lerp(cam.transform.position,desiredCamera,Mathf.Min(1,Time.deltaTime*7));
+            cameraLayer=layer;
 
             autosaveT += Time.deltaTime;
             if (autosaveT > 60) { autosaveT = 0; world.CaptureState(); ScSave.Save(world.data); }
@@ -128,6 +142,23 @@ namespace ServerClosed.Runtime
             }
         }
 
+        // Shared application commands: UI and automated play checks use the same transitions.
+        public bool TalkToNearbyNpc()
+        {
+            if(world==null || world.data.deathCause!=null || inChess || world.nearNpcId==null) return false;
+            dialogNpc=world.nearNpcId; return true;
+        }
+        public bool ChooseDialogueOption(string optionId)
+        {
+            if(dialogNpc==null || !ScNpcs.Dialogue(world,dialogNpc).options.Exists(o=>o.id==optionId)) return false;
+            ScNpcs.Action(world,dialogNpc,optionId);
+            if(world.ConsumeStartRaid()) { dialogNpc=null; OpenChess(); }
+            return true;
+        }
+        public bool PlaceDefenseUnit(string id,int row,int col) { return inChess && ScChess.Place(world.data.chess,id,row,col); }
+        public void BeginDefenseBattle() { if(inChess) ScChess.Start(world.data.chess); }
+        public void ContinueAfterJudgment() { if(world.data.deathCause!=null) deathStage=1; }
+
         // ===== Magic Chess (§14): расстановка → автобой → последствия =====
         void OpenChess()
         {
@@ -140,7 +171,16 @@ namespace ServerClosed.Runtime
             Toast("Время остановилось. Расставьте оборону.", 5);
         }
 
-        void CloseChess()
+        void RestoreChess()
+        {
+            inChess = world.data.chess != null;
+            if (!inChess) return;
+            chessTimer = 0;
+            chessRng = new ScRng(world.data.seed ^ 0x51ed270b);
+            if (world.data.chess.battleRngState >= 0) chessRng.State = (uint)world.data.chess.battleRngState;
+        }
+
+        public void CloseChess()
         {
             world.data.chess = null;
             inChess = false;
@@ -220,7 +260,7 @@ namespace ServerClosed.Runtime
             if (_ePressed)
             {
                 _ePressed = false;
-                if (world.nearNpcId != null) dialogNpc = world.nearNpcId;
+                if (world.nearNpcId != null) TalkToNearbyNpc();
                 else if (world.DungeonActive)
                 {
                     if (world.data.activeDungeon == "birth_nest" && world.nearStairsUp) world.ExitBirthNest();
@@ -326,7 +366,8 @@ namespace ServerClosed.Runtime
             if (showLog) DrawLog();
             if (showQuests) DrawQuests();
             if (showVillage) DrawVillage();
-            if (dialogNpc != null) DrawDialogue();
+            if (dialogNpc != null) { DrawDialogue(); return; }
+            if (inChess) return;
 
             // нижние действия по близости
             float by = UiHeight - 54;
@@ -337,7 +378,7 @@ namespace ServerClosed.Runtime
             if (world.nearNpcId != null)
             {
                 var npc = world.Npc(world.nearNpcId);
-                if (npc != null && GUI.Button(new Rect(12, cy, 210, 40), "Поговорить: " + npc.name + " [E]")) dialogNpc = npc.id;
+                if (npc != null && GUI.Button(new Rect(12, cy, 210, 40), "Поговорить: " + npc.name + " [E]")) TalkToNearbyNpc();
                 cy -= 46;
             }
             if (!world.DungeonActive && world.nearGateId != null)
@@ -420,12 +461,22 @@ namespace ServerClosed.Runtime
         }
 
         // ===== Диалог NPC (§3.2, §13) =====
+        void DrawModalBackdrop(Rect area)
+        {
+            var color=GUI.color;
+            GUI.color=new Color(0.025f,0.035f,0.025f,1);
+            GUI.DrawTexture(area,Texture2D.whiteTexture);
+            GUI.color=color;
+        }
+
         void DrawDialogue()
         {
             var dlg = ScNpcs.Dialogue(world, dialogNpc);
             float w = Mathf.Min(460, UiWidth - 40);
             float h = Mathf.Min(360, UiHeight - 200);
-            GUILayout.BeginArea(new Rect((UiWidth - w) / 2, UiHeight * 0.22f, w, h), boxStyle);
+            var dialogArea=new Rect((UiWidth-w)/2,UiHeight*0.22f,w,h);
+            DrawModalBackdrop(dialogArea);
+            GUILayout.BeginArea(dialogArea,boxStyle);
             GUILayout.Label(dlg.name + " · " + dlg.role, bigLabel);
             dlgScroll = GUILayout.BeginScrollView(dlgScroll, GUILayout.Height(Mathf.Max(60f, Mathf.Min(110f, h - 190f))));
             GUILayout.Label(dlg.text, bigLabel);
@@ -435,8 +486,8 @@ namespace ServerClosed.Runtime
                 if (opt.id == "leave") continue;
                 if (GUILayout.Button(opt.label, btnStyle))
                 {
-                    ScNpcs.Action(world, dialogNpc, opt.id);
-                    if (world.ConsumeStartRaid()) { dialogNpc = null; OpenChess(); return; }   // кадр завершён — дальше рисуется шахматная доска
+                    ChooseDialogueOption(opt.id);
+                    if (inChess) { GUILayout.EndArea(); return; }   // кадр завершён — дальше рисуется шахматная доска
                 }
             }
             if (GUILayout.Button("Уйти", btnStyle)) dialogNpc = null;
@@ -448,13 +499,15 @@ namespace ServerClosed.Runtime
         {
             var st = world.data.chess;
             if (st == null) { inChess = false; return; }
-            GUI.Box(new Rect(0, 0, UiWidth, UiHeight), "");
+            DrawModalBackdrop(new Rect(0,0,UiWidth,UiHeight));
             GUILayout.BeginArea(new Rect(16, 12, UiWidth - 32, 70), boxStyle);
             GUILayout.Label(st.scenario, bigLabel);
             GUILayout.Label(st.stake + "  ·  Юнитов: " + st.placed.Count + "/" + st.reserveLimit +
                 "  ·  время мира: " + (st.phase == "setup" ? "остановлено" : "+" + System.Math.Round(st.worldMinutesSpent) + " мин"), smallLabel);
             GUILayout.EndArea();
 
+            var cellStyle=new GUIStyle(GUI.skin.box) {fontSize=11,wordWrap=true,alignment=TextAnchor.MiddleCenter};
+            var cellButton=new GUIStyle(GUI.skin.button) {fontSize=11,wordWrap=true,alignment=TextAnchor.MiddleCenter};
             // поле 7×5 (на узких экранах панель состава уходит под доску)
             float rw = Mathf.Min(330, UiWidth - 40);
             bool sidePanel = UiWidth >= 780;
@@ -481,12 +534,14 @@ namespace ServerClosed.Runtime
                         double maxHp = unit.side == "player" ? (udef != null ? udef.hp : 1) : ScChess.EnemyBaseHp(unit.defId);
                         label = uname + "\n" + System.Math.Max(0, System.Math.Round(unit.hp)) + "/" + System.Math.Round(maxHp);
                     }
-                    bool clicked = st.phase == "setup" && playerZone && GUI.Button(rect, label);
+                    bool clicked = false;
+                    if (st.phase == "setup" && playerZone) clicked = GUI.Button(rect, label, cellButton);
+                    else GUI.Box(rect, label, cellStyle);
                     GUI.backgroundColor = Color.white;
                     if (clicked)
                     {
                         var def = st.playerRoster.Find(dd => !st.placed.Exists(u => u.defId == dd.id));
-                        if (def != null && st.placed.Count < st.reserveLimit) ScChess.Place(st, def.id, r, c);
+                        if (def != null && st.placed.Count < st.reserveLimit) PlaceDefenseUnit(def.id, r, c);
                     }
                 }
 
@@ -508,7 +563,7 @@ namespace ServerClosed.Runtime
                 }
                 GUILayout.EndScrollView();
                 GUI.enabled = st.placed.Count > 0;
-                if (GUILayout.Button("Трубить сбор (начать бой)", GUILayout.Height(40))) ScChess.Start(st);
+                if (GUILayout.Button("Трубить сбор (начать бой)", GUILayout.Height(40))) BeginDefenseBattle();
                 GUI.enabled = true;
             }
             else if (st.phase == "battle")
@@ -535,7 +590,7 @@ namespace ServerClosed.Runtime
         // ===== Экран Суда души (§11.2) =====
         void DrawJudgment()
         {
-            GUI.Box(new Rect(0, 0, UiWidth, UiHeight), "");
+            DrawModalBackdrop(new Rect(0,0,UiWidth,UiHeight));
             float w = Mathf.Min(620, UiWidth - 40);
             var j = world.JudgmentView();
             GUILayout.BeginArea(new Rect((UiWidth - w) / 2, 20, w, UiHeight - 40), boxStyle);
@@ -543,7 +598,7 @@ namespace ServerClosed.Runtime
             GUILayout.Label("СУД ДУШИ", titleStyle);
             if (j != null)
             {
-                GUILayout.Label("Воплощение №" + world.data.soul.life + " · вердикт: " + j.verdict, bigLabel);
+                GUILayout.Label("Воплощение №" + world.data.lifeNo + " · вердикт: " + j.verdict, bigLabel);
                 GUILayout.Label(j.summary, bigLabel);
                 GUILayout.Label("Прожито: " + System.Math.Floor(j.ageDays) + " дн. · Карма: " + (j.karma > 0 ? "+" : "") + System.Math.Round(j.karma) +
                     " · Опыт: +" + j.xpGained + " · Уровень души: " + j.newSoulLevel + (j.levelUp ? " ↑" : ""), bigLabel);
@@ -573,7 +628,7 @@ namespace ServerClosed.Runtime
                 GUILayout.Label(world.JudgmentSummary(), bigLabel);
             }
             GUILayout.Label("Путь: " + world.KarmaPath() + "  ·  Карма: " + System.Math.Round(world.data.soul.karma), bigLabel);
-            if (GUILayout.Button("К новому воплощению", btnStyle, GUILayout.Height(44))) deathStage = 1;
+            if (GUILayout.Button("К новому воплощению", btnStyle, GUILayout.Height(44))) ContinueAfterJudgment();
             GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
@@ -581,7 +636,7 @@ namespace ServerClosed.Runtime
         // ===== Экран Реинкарнации с выбором тела (§11.3) =====
         void DrawReincarnation()
         {
-            GUI.Box(new Rect(0, 0, UiWidth, UiHeight), "");
+            DrawModalBackdrop(new Rect(0,0,UiWidth,UiHeight));
             float w = Mathf.Min(620, UiWidth - 40);
             var soul = world.data.soul;
             GUILayout.BeginArea(new Rect((UiWidth - w) / 2, 20, w, UiHeight - 40), boxStyle);
@@ -614,7 +669,7 @@ namespace ServerClosed.Runtime
             GUILayout.EndArea();
         }
 
-        void ReincarnateWith(string optionId)
+        public void ReincarnateWith(string optionId)
         {
             if (!world.ReincarnateWith(optionId)) return;
             deathStage = 0;

@@ -24,8 +24,8 @@ namespace ServerClosed.Core
                 if (v == null) { sb.Append("null"); return; }
                 if (v is string) { WriteString(sb, (string)v); return; }
                 if (v is bool) { sb.Append((bool)v ? "true" : "false"); return; }
-                if (v is double) { sb.Append(((double)v).ToString(System.Globalization.CultureInfo.InvariantCulture)); return; }
-                if (v is float) { sb.Append(((float)v).ToString(System.Globalization.CultureInfo.InvariantCulture)); return; }
+                if (v is double) { sb.Append(((double)v).ToString("R", System.Globalization.CultureInfo.InvariantCulture)); return; }
+                if (v is float) { sb.Append(((float)v).ToString("R", System.Globalization.CultureInfo.InvariantCulture)); return; }
                 if (v is int) { sb.Append(((int)v).ToString(System.Globalization.CultureInfo.InvariantCulture)); return; }
                 if (v is long) { sb.Append(((long)v).ToString(System.Globalization.CultureInfo.InvariantCulture)); return; }
                 var dict = v as System.Collections.IDictionary;

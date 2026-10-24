@@ -1,0 +1,1 @@
+PASS: saved battle restored by a new player process, advanced to result, result applied once; errors=0.

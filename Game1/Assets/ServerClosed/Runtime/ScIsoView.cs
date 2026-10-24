@@ -317,7 +317,7 @@ namespace ServerClosed.Runtime
         {
             var p = world.data.player;
             var target = PosToWorld(p.x, p.y) + new Vector3(0, 0.06f, 0);
-            if (_slimePts == null)
+            if (_slimePts == null || Vector3.Distance(_slimeCenter,target)>3)
             {
                 _slimeCenter = target;
                 _slimePts = new Vector2[SLIME_N];
@@ -441,6 +441,34 @@ namespace ServerClosed.Runtime
             if (world.DungeonActive) a = Mathf.Max(a, 0.22f);
             if (world.data.senses.unlocked.Length < 3) a = Mathf.Max(a, 0.10f); // слепота чуть темнее
             _overlayMat.color = new Color(0.01f, 0.02f, 0.04f, a);
+        }
+
+        // World landmarks use the same perception limits as the surrounding map.
+        void OnGUI()
+        {
+            if(world==null || cam==null || world.data.deathCause!=null || world.data.chess!=null) return;
+            var app=GetComponent<ScBootstrap>(); if(app!=null && app.IsModalOpen) return;
+            var matrix=GUI.matrix; GUI.matrix=Matrix4x4.identity;
+            var style=new GUIStyle(GUI.skin.box) { fontSize=Mathf.Max(12,Mathf.RoundToInt(Screen.height/720f*12)), alignment=TextAnchor.MiddleCenter };
+            if(!world.DungeonActive) {
+                foreach(var npc in world.data.npcs) if(npc.alive) Landmark(npc.x,npc.y,npc.name,style);
+                foreach(var def in ScDungeon.Defs) { var gate=def.gatePos(world.data); Landmark(gate.x,gate.y,"↓ "+def.name,style); }
+            } else {
+                var f=world.Dun.floors[world.Dun.depth-1];
+                Landmark(f.upX+0.5f,f.upY+0.5f,"↑ Наверх",style);
+                if(f.downX>=0 && f.downY>=0) Landmark(f.downX+0.5f,f.downY+0.5f,world.data.activeDungeon=="birth_nest"?"Кладка":"↓ Глубже",style);
+                foreach(var cache in world.Dun.caches) if(!cache.taken && cache.depth==world.Dun.depth) Landmark(cache.x,cache.y,"Запасы",style);
+            }
+            GUI.matrix=matrix;
+        }
+        void Landmark(float x,float y,string label,GUIStyle style)
+        {
+            if(!world.IsTileExplored((int)x,(int)y)) return;
+            var p=world.data.player;
+            if(ScRng.Dist(x,y,p.x,p.y)>System.Math.Max(world.TouchRadius()+0.4,world.VisionRadius())) return;
+            var screen=cam.WorldToScreenPoint(PosToWorld(x,y));
+            float width=Mathf.Max(100,style.CalcSize(new GUIContent(label)).x+12);
+            GUI.Box(new Rect(screen.x-width/2,Screen.height-screen.y-34,width,26),label,style);
         }
 
         void OnDestroy()

@@ -1,5 +1,22 @@
 # Передача SERVERCLOSED другому ИИ
 
+## Актуальная независимая проверка Unity
+
+v1.2/v1.3 применены из bundle с сохранением всех 10 авторских коммитов.
+Поверх них исправлены ошибки интеграции и добавлены 4 регрессии: теперь
+**56/56 PASS в .NET и Unity EditMode**. Windows и Android собраны; одинаковый
+сценарий диалога/обороны/Катакомб/Суда/перерождения проверен в реальном плеере
+и на Samsung SM-G780F / Android 13. Обязательно сначала прочитайте
+[новый отчёт](Validation/2026-10-24-unity-v1.3-verified.md): он заменяет прежние
+статусы Unity NOT RUN, но не объявляет ручные Windows-клики выполненными.
+
+Особенности исправленной версии: ChessState хранит battleRngState, nextUnitId и
+resultApplied; ScJson пишет float/double с форматом R; Bootstrap восстанавливает
+фазу боя при загрузке. NPC/входы/лестницы имеют обозначения в пределах восприятия.
+ScReviewSession — изолированный Development-режим проверки, не обычная игровая механика.
+Тесты и кадры: `Docs/Validation/port-v1.3-unity-evidence/`.
+
+
 ## С чего начать
 
 Рабочий Unity-проект — **`Game1`**. Редактор **6000.6.5f1**, сцена
@@ -39,7 +56,7 @@ Unity-компиляция/EditMode/сборки для v1.3 — NOT RUN (вып
 | `Runtime/ScBootstrap.cs` | Вход, Input System, IMGUI: HUD (сезон/регион/посёлок), задания, диалоги NPC, подземелья, Magic Chess, Суд души и выбор тела |
 | `Runtime/ScIsoView.cs` | Процедурная изометрия, тело слизня, туман и маяк |
 | `Resources/ScVertexColor.shader` | Шейдер геометрии для установленного URP |
-| `Editor/ScRegressionChecks.cs` | 52 воспроизводимых регрессионных сценария |
+| `Editor/ScRegressionChecks.cs` | 56 воспроизводимых регрессионных сценариев |
 | `Tests/EditMode/PortRegressionTests.cs` | Обёртка проверок для Unity Test Runner |
 | `Editor/ScBuildValidation.cs` | Подготовка основной сцены и сборки Windows/Android |
 | `Runtime/ScPlayerSmoke.cs` | Только автоматическая проверка через `--sc-smoke`; обычному игроку не включается |

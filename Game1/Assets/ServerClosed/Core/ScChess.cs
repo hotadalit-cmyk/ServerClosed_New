@@ -101,20 +101,21 @@ namespace ServerClosed.Core
             };
         }
 
-        static int uidSeq = 1000;
+
 
         public static bool Place(ChessState st, string defId, int r, int c)
         {
             if (st.phase != "setup") return false;
-            if (r < 3) return false; // свои ряды — нижние два
+            if (r < 3 || r >= st.boardR || c < 0 || c >= st.boardC) return false; // свои ряды — нижние два
             if (st.placed.Exists(u => u.alive && u.r == r && u.c == c)) return false;
             ChessUnit existing = st.placed.Find(u => u.defId == defId);
             if (existing != null) { existing.r = r; existing.c = c; return true; } // переставить
             if (st.placed.Count >= st.reserveLimit) return false;
             ChessUnitDef def = st.playerRoster.Find(d => d.id == defId);
             if (def == null) return false; // неизвестный юнит (не в ростере) — тихо отклоняем
+            foreach (var unit in st.placed) st.nextUnitId = Math.Max(st.nextUnitId, unit.uid);
             st.placed.Add(new ChessUnit {
-                uid = ++uidSeq, defId = defId, side = "player", r = r, c = c,
+                uid = ++st.nextUnitId, defId = defId, side = "player", r = r, c = c,
                 hp = def.hp, cd = 0.4, alive = true,
             });
             return true;
@@ -122,12 +123,12 @@ namespace ServerClosed.Core
 
         public static void Remove(ChessState st, int uid)
         {
-            st.placed.RemoveAll(u => u.uid == uid);
+            if (st.phase == "setup") st.placed.RemoveAll(u => u.uid == uid);
         }
 
         public static void Start(ChessState st)
         {
-            if (st.placed.Count == 0) return;
+            if (st.phase != "setup" || st.placed.Count == 0) return;
             st.phase = "battle";
             st.battleLog.Add("Рог ополчения трубит! Время снова пошло.");
         }
@@ -154,6 +155,9 @@ namespace ServerClosed.Core
         /// Один тик автобоя (~400 мс). Возвращает true, если бой завершён.
         public static bool Tick(ChessState st, ScRng rng)
         {
+            if (st.battleRngState >= 0) rng.State = (uint)st.battleRngState;
+            try
+            {
             if (st.phase != "battle") return true;
             st.worldMinutesSpent += 3.3; // бой съедает небольшой фиксированный интервал мирового времени (§7)
 
@@ -325,6 +329,9 @@ namespace ServerClosed.Core
                 return true;
             }
             return false;
+
+            }
+            finally { st.battleRngState = rng.State; }
         }
 
         static bool IsOccupied(ChessState st, ChessUnit self, int r, int c)
@@ -338,6 +345,8 @@ namespace ServerClosed.Core
         /// Применить результат боя к миру (последствия §14/§20).
         public static void ApplyResult(ScWorld world, ChessState st)
         {
+            if (st.phase != "result" || st.resultApplied || (st.result != "win" && st.result != "lose")) return;
+            st.resultApplied = true;
             var v = world.data.village;
             v.raidPending = false;
             v.raidCdDays = 4;

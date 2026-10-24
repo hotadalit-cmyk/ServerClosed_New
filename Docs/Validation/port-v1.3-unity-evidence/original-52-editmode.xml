@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="52" result="Passed" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.2150914">
+  <test-suite type="TestSuite" id="1000" name="Game1" fullname="Game1" runstate="Runnable" testcasecount="58" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.215091" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1055" name="ServerClosed.Port.Tests.dll" fullname="C:/UnityProjects/ServerClosed_PortValidation_20261024/Library/ScriptAssemblies/ServerClosed.Port.Tests.dll" runstate="Runnable" testcasecount="52" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.207561" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="52356" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1056" name="ServerClosed" fullname="ServerClosed" runstate="Runnable" testcasecount="52" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.206845" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1057" name="Port" fullname="ServerClosed.Port" runstate="Runnable" testcasecount="52" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.206402" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1058" name="Tests" fullname="ServerClosed.Port.Tests" runstate="Runnable" testcasecount="52" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.205944" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1001" name="PortRegressionTests" fullname="ServerClosed.Port.Tests.PortRegressionTests" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" testcasecount="52" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.204991" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-suite type="ParameterizedMethod" id="1054" name="Regression" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" testcasecount="52" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:57Z" duration="5.197876" total="52" passed="52" failed="0" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <test-case id="1002" name="Regression(&quot;SeedDeterminism&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SeedDeterminism&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1966057824" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.054636" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1003" name="Regression(&quot;MissingSenseMultiplier&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;MissingSenseMultiplier&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="674799228" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.002297" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1004" name="Regression(&quot;PartialSenseMultiplier&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;PartialSenseMultiplier&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="391808273" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.001293" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1005" name="Regression(&quot;DigestionExactlyOnce&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;DigestionExactlyOnce&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1515574638" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.002102" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1006" name="Regression(&quot;NestCombatExit&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;NestCombatExit&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="2126092552" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.026560" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1007" name="Regression(&quot;SaveRoundtrip&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SaveRoundtrip&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1516597109" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.051522" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1008" name="Regression(&quot;RngContinuation&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RngContinuation&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1685686119" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.031825" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1009" name="Regression(&quot;DayCounterContinuation&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;DayCounterContinuation&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1090021528" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.001299" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1010" name="Regression(&quot;PausedWorld&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;PausedWorld&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1328483973" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.016706" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1011" name="Regression(&quot;DeadBodyCommands&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;DeadBodyCommands&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="412680002" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.011584" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1012" name="Regression(&quot;ReincarnationKeepsWorld&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;ReincarnationKeepsWorld&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1753646454" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.009807" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1013" name="Regression(&quot;RepairInvalidPosition&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RepairInvalidPosition&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="515309908" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.001507" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1014" name="Regression(&quot;SaveFallback&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SaveFallback&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="56918051" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.175284" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1015" name="Regression(&quot;CorruptSaveRejected&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;CorruptSaveRejected&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="655553594" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.134149" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1016" name="Regression(&quot;MalformedJsonRejected&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;MalformedJsonRejected&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1355414330" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.001381" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1017" name="Regression(&quot;SprintSpeed&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SprintSpeed&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="299168253" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.003655" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1018" name="Regression(&quot;VisionExploresMap&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;VisionExploresMap&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="939843475" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.001681" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1019" name="Regression(&quot;FogHidesDistantEntities&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;FogHidesDistantEntities&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="477540426" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:52Z" duration="0.001428" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1020" name="Regression(&quot;SimulationSoak&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SimulationSoak&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1352172767" result="Passed" start-time="2026-10-24 20:28:52Z" end-time="2026-10-24 20:28:53Z" duration="1.021882" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1021" name="Regression(&quot;SoulNewGameDefaults&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SoulNewGameDefaults&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1511636333" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.001476" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1022" name="Regression(&quot;SoulLevelThresholds&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SoulLevelThresholds&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1698235896" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.001202" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1023" name="Regression(&quot;RegionWeightFormula&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RegionWeightFormula&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="997304864" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.001170" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1024" name="Regression(&quot;RegionRollDeterminism&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RegionRollDeterminism&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="616140732" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.001227" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1025" name="Regression(&quot;JudgmentAppliesOnce&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;JudgmentAppliesOnce&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1073638941" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.038104" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1026" name="Regression(&quot;JudgmentOldAgeUnlocks&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;JudgmentOldAgeUnlocks&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="151446795" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.001667" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1027" name="Regression(&quot;ReincarnationRegionBirth&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;ReincarnationRegionBirth&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="248233132" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.001508" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1028" name="Regression(&quot;SoulSaveRoundtrip&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SoulSaveRoundtrip&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="226790517" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:53Z" duration="0.047810" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1029" name="Regression(&quot;RegionHazards&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RegionHazards&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1305920911" result="Passed" start-time="2026-10-24 20:28:53Z" end-time="2026-10-24 20:28:57Z" duration="3.359764" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1030" name="Regression(&quot;WorldAdvanceAfterDeath&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;WorldAdvanceAfterDeath&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1999753645" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001287" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1031" name="Regression(&quot;OldSaveMigration&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;OldSaveMigration&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="823032034" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.086771" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1032" name="Regression(&quot;QuestAcceptTurnIn&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;QuestAcceptTurnIn&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1573293576" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.002357" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1033" name="Regression(&quot;QuestRequiresChain&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;QuestRequiresChain&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="2080587260" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001295" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1034" name="Regression(&quot;QuestRetroactive&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;QuestRetroactive&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="91182170" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001158" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1035" name="Regression(&quot;QuestDonateProgress&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;QuestDonateProgress&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1325404066" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001396" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1036" name="Regression(&quot;SeasonRotationMods&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SeasonRotationMods&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="722875659" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001670" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1037" name="Regression(&quot;SeasonVillageFoodDelta&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SeasonVillageFoodDelta&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="305346068" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.004986" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1038" name="Regression(&quot;SeasonMigrationsMove&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SeasonMigrationsMove&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="224316754" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.002688" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1039" name="Regression(&quot;SeasonNeutralInDungeon&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;SeasonNeutralInDungeon&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1780489071" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001155" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1040" name="Regression(&quot;VillageStageEconomy&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;VillageStageEconomy&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1221708878" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001176" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1041" name="Regression(&quot;RaidCycleIgnored&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RaidCycleIgnored&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="537600599" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.002629" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1042" name="Regression(&quot;RaidDefenseChess&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;RaidDefenseChess&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1948311731" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.006777" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1043" name="Regression(&quot;ChessRulesSetup&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;ChessRulesSetup&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1441333003" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001284" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1044" name="Regression(&quot;NpcDialogueOptions&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;NpcDialogueOptions&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="871844675" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.004084" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1045" name="Regression(&quot;DonateStealFood&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;DonateStealFood&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="2013863951" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001424" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1046" name="Regression(&quot;NpcSuccession&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;NpcSuccession&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="411275776" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.002367" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1047" name="Regression(&quot;DungeonCatacombsPort&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;DungeonCatacombsPort&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="266872046" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.003825" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1048" name="Regression(&quot;DungeonStairsCache&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;DungeonStairsCache&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1693165540" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.004965" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1049" name="Regression(&quot;AtlasDiscoveryFlow&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;AtlasDiscoveryFlow&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="2007681550" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.003974" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1050" name="Regression(&quot;CrackSmallBodyOnly&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;CrackSmallBodyOnly&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="1563615316" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001662" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1051" name="Regression(&quot;KarmaPathThresholds&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;KarmaPathThresholds&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="776907192" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001133" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1052" name="Regression(&quot;WorldV13Roundtrip&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;WorldV13Roundtrip&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="554955867" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.033507" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                </test-case>
+                <test-case id="1053" name="Regression(&quot;JudgmentBodyChoice&quot;)" fullname="ServerClosed.Port.Tests.PortRegressionTests.Regression(&quot;JudgmentBodyChoice&quot;)" methodname="Regression" classname="ServerClosed.Port.Tests.PortRegressionTests" runstate="Runnable" seed="90897316" result="Passed" start-time="2026-10-24 20:28:57Z" end-time="2026-10-24 20:28:57Z" duration="0.001606" asserts="0">
+                  <properties>
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <output><![CDATA[Saving results to: C:/Users/Химия/AppData/LocalLow/DefaultCompany/Game1\TestResults.xml
+Saving results to: C:/Users/Химия/AppData/LocalLow/DefaultCompany/Game1\TestResults.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

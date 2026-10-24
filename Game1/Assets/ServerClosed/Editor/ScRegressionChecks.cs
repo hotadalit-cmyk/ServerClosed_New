@@ -23,7 +23,8 @@ namespace ServerClosed.Validation
             "VillageStageEconomy", "RaidCycleIgnored", "RaidDefenseChess", "ChessRulesSetup",
             "NpcDialogueOptions", "DonateStealFood", "NpcSuccession",
             "DungeonCatacombsPort", "DungeonStairsCache", "AtlasDiscoveryFlow", "CrackSmallBodyOnly",
-            "KarmaPathThresholds", "WorldV13Roundtrip", "JudgmentBodyChoice"
+            "KarmaPathThresholds", "WorldV13Roundtrip", "JudgmentBodyChoice",
+            "ChessPlacementBounds", "ChessResultOnce", "ChessSaveContinuation", "ChessSetupDeterminism"
         };
         static ScWorld World() { return ScWorld.NewGame(123456, 1); }
         static ScWorld World(int seed) { return ScWorld.NewGame(seed, 1); }
@@ -793,6 +794,31 @@ namespace ServerClosed.Validation
                     Check(w.ReincarnateWith("wolfblood_slug"), "Second reincarnation refused");
                     Check(Math.Abs(w.data.player.bonusAtk - 1) < 1e-9 && Math.Abs(w.data.player.bonusSpeed - 0.2) < 1e-9, "wolfblood body gifts missing");
                     Check(w.data.player.perks.Contains("hunter_instinct"), "wolfblood perk missing");
+                    break; }
+                case "ChessPlacementBounds": {
+                    var st=ScChess.CreateRaidChess(w);
+                    Check(!ScChess.Place(st,"cmdr",5,0) && !ScChess.Place(st,"cmdr",3,-1) && !ScChess.Place(st,"cmdr",3,7),"Unit placed outside board");
+                    break; }
+                case "ChessResultOnce": {
+                    var st=ScChess.CreateRaidChess(w); st.phase="result"; st.result="win";
+                    ScChess.ApplyResult(w,st); string first=ScJson.ToJson(w.data);
+                    ScChess.ApplyResult(w,st);
+                    Check(first==ScJson.ToJson(w.data),"Raid rewards applied twice");
+                    break; }
+                case "ChessSaveContinuation": {
+                    var st=ScChess.CreateRaidChess(w);
+                    ScChess.Place(st,"cmdr",3,2); ScChess.Place(st,"militia",3,3); ScChess.Start(st);
+                    var random=new ScRng(124);
+                    for(int i=0;i<8 && st.phase=="battle";i++) ScChess.Tick(st,random);
+                    var chessRestored=ScJson.FromJson<ChessState>(ScJson.ToJson(st));
+                    var resumedRandom=new ScRng(999);
+                    for(int i=0;i<20 && st.phase=="battle";i++) { ScChess.Tick(st,random); ScChess.Tick(chessRestored,resumedRandom); }
+                    Check(ScJson.ToJson(st)==ScJson.ToJson(chessRestored),"Save/reload changed chess battle outcome or RNG");
+                    break; }
+                case "ChessSetupDeterminism": {
+                    var first=ScChess.CreateRaidChess(w); var chessSecond=ScChess.CreateRaidChess(World());
+                    ScChess.Place(first,"cmdr",3,2); ScChess.Place(chessSecond,"cmdr",3,2);
+                    Check(ScJson.ToJson(first)==ScJson.ToJson(chessSecond),"Global unit counter breaks deterministic setup");
                     break; }
                 default: throw new ArgumentException(name);
             }

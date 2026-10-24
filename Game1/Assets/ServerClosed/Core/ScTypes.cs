@@ -291,6 +291,9 @@ namespace ServerClosed.Core
         public int reserveLimit;
         public List<string> battleLog = new List<string>();
         public double worldMinutesSpent;
+        public long battleRngState = -1;
+        public int nextUnitId = 1000;
+        public bool resultApplied;
         public string scenario, stake, result;   // result: win | lose (только в фазе result)
     }
 
