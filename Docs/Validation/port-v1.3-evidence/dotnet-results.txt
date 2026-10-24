@@ -1,0 +1,62 @@
+SERVERCLOSED Unity port v1.3 — .NET-прогон регрессионного набора
+Дата: 2026-10-24T19:58Z UTC · .NET 10.0.402 · раннер: scripts/scnet (net10.0)
+Набор: 52 проверки (v1.1 19 + v1.2 +11 + v1.3 +22) — тот же Editor/ScRegressionChecks.cs, что обёрнут в Unity EditMode
+
+=== ПРОГОН 1 ===
+SERVERCLOSED regression suite (.NET 10.0.13)
+PASS SeedDeterminism
+PASS MissingSenseMultiplier
+PASS PartialSenseMultiplier
+PASS DigestionExactlyOnce
+PASS NestCombatExit
+PASS SaveRoundtrip
+PASS RngContinuation
+PASS DayCounterContinuation
+PASS PausedWorld
+PASS DeadBodyCommands
+PASS ReincarnationKeepsWorld
+PASS RepairInvalidPosition
+PASS SaveFallback
+PASS CorruptSaveRejected
+PASS MalformedJsonRejected
+PASS SprintSpeed
+PASS VisionExploresMap
+PASS FogHidesDistantEntities
+PASS SimulationSoak
+PASS SoulNewGameDefaults
+PASS SoulLevelThresholds
+PASS RegionWeightFormula
+PASS RegionRollDeterminism
+PASS JudgmentAppliesOnce
+PASS JudgmentOldAgeUnlocks
+PASS ReincarnationRegionBirth
+PASS SoulSaveRoundtrip
+PASS RegionHazards
+PASS WorldAdvanceAfterDeath
+PASS OldSaveMigration
+PASS QuestAcceptTurnIn
+PASS QuestRequiresChain
+PASS QuestRetroactive
+PASS QuestDonateProgress
+PASS SeasonRotationMods
+PASS SeasonVillageFoodDelta
+PASS SeasonMigrationsMove
+PASS SeasonNeutralInDungeon
+PASS VillageStageEconomy
+PASS RaidCycleIgnored
+PASS RaidDefenseChess
+PASS ChessRulesSetup
+PASS NpcDialogueOptions
+PASS DonateStealFood
+PASS NpcSuccession
+PASS DungeonCatacombsPort
+PASS DungeonStairsCache
+PASS AtlasDiscoveryFlow
+PASS CrackSmallBodyOnly
+PASS KarmaPathThresholds
+PASS WorldV13Roundtrip
+PASS JudgmentBodyChoice
+Итого: 52/52 PASS
+
+=== ПРОГОН 2 (детерминизм) ===
+Итого: 52/52 PASS
