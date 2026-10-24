@@ -144,8 +144,11 @@ namespace ServerClosed.Core
         {
             // Зло учитывается в хищной природе; добро — только в весах рождения (BirthWeights), как в regions.ts.
             double evil = Math.Max(0, -karmaTotal);
-            // Задания посёлка ещё не перенесены (v1.2): quest_done_* флагов нет — questsDone = 0.
-            // Милосердие: вожак убит вне задания (wolfQuestDone появится с заданиями; пока считаем вне задания).
+            // Задания посёлка (v1.3 перенесены): завершённые задания растят память души.
+            // Веб-формула считала устаревший список id (wolves/hides/myco/shards/famine/titan);
+            // в порту честно считаются все 6 реальных заданий quests.ts.
+            int questsDone = ScQuests.CompletedCount(d);
+            // Милосердие: вожак убит вне задания (wolfQuestDone ставит сдача «Трёх шкур»)
             int mercy = (d.alphaKilled == 1 && d.wolfQuestDone == 0) ? 1 : 0;
 
             var t = new SoulTraits
@@ -172,7 +175,7 @@ namespace ServerClosed.Core
                 -20, 24);
             // Память души: воспоминания, изученный мир, задания
             t.memory += ScRng.Clamp(
-                memUnlocked * 5 + Math.Min(8, discovered * 0.6), 0, 20);
+                memUnlocked * 5 + Math.Min(8, discovered * 0.6) + questsDone * 1.5, 0, 20);
             t.resilience = Math.Round(ScRng.Clamp(t.resilience, 0, 100));
             t.depth = Math.Round(ScRng.Clamp(t.depth, 0, 100));
             t.predator = Math.Round(ScRng.Clamp(t.predator, 0, 100));

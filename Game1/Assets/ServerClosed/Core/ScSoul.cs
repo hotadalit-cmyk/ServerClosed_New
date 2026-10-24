@@ -94,10 +94,13 @@ namespace ServerClosed.Core
             return a;
         }
 
-        // ===== Изученные виды этой жизни: из ведомости поглощений (в вебе — player.discoveredSpecies) =====
+        // ===== Изученные виды этой жизни: в момент поглощения пишем в player.discoveredSpecies (как в вебе);
+        // для старых сейвов v1.1–v1.2 — резервный разбор ведомости кармы (absorb_*) =====
 
         public static List<string> DiscoveredSpecies(WorldData d)
         {
+            if (d.player != null && d.player.discoveredSpecies != null && d.player.discoveredSpecies.Count > 0)
+                return d.player.discoveredSpecies;
             var found = new List<string>();
             foreach (KarmaEvent e in d.karmaEvents)
             {
@@ -138,7 +141,8 @@ namespace ServerClosed.Core
             if (d.dungeonEntered == 1) unlockedNow.Add("descender");
             if (d.monarchKilled == 1) unlockedNow.Add("monarch");
             if (d.titanKilled == 1) unlockedNow.Add("titan");
-            // quests3 — задания посёлка ещё не перенесены (v1.2), условия никогда не возникают
+            // quests3 — друг Опушки: три задания поселян (§13)
+            if (ScQuests.CompletedCount(d) >= 3) unlockedNow.Add("quests3");
             if (Array.IndexOf(d.senses.unlocked, "vision") >= 0) unlockedNow.Add("senses_awake");
             if (d.senseCore == 1) unlockedNow.Add("core_formed");
 

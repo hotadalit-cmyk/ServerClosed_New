@@ -16,6 +16,10 @@ namespace ServerClosed.Core
 
         // Рантайм (не сохраняются)
         public int nearCorpseId = -1;
+        public string nearNpcId;                 // NPC рядом (диалог по [E]/кнопке)
+        public string nearGateId;                // врата подземелья рядом
+        public bool nearStairsUp, nearStairsDown;
+        public int nearCacheId = -1;
         public double shakeT;
         public double senseTime;
         public bool coreActive;
@@ -24,6 +28,10 @@ namespace ServerClosed.Core
         // опасности региона (regions.ts updateRegion — рантайм)
         double poisonAcc; bool poisonLogged;
         double stormT, stormHit; double stormCd = 22; int stormSurvived;
+        // сезоны (Этап 2): кеш модификаторов + отслеживание смены сезона (миграции/хроника)
+        string lastSeason;                       // null после загрузки — первый тик без хроники (как в вебе)
+        SeasonMods seasonModsCache;
+        double crackHintT;                       // троттлинг подсказки про узкую трещину
 
         // ===== Создание мира =====
         public static ScWorld NewGame(int seed, int lifeNo)
@@ -43,6 +51,9 @@ namespace ServerClosed.Core
             d.achievements = ScSoul.InitAchievements();
 
             w.SpawnInitialPops();
+            w.SpawnGuards();
+            w.SeedCrack();
+            w.EnsureV13();
             w.EnterBirthNest();
             w.PushLog("Родовая норка. Вы — бесформенный комочек слизи. Поглощайте живность: лаза наружу ещё не достать.", "world");
             return w;
@@ -57,8 +68,52 @@ namespace ServerClosed.Core
             w.stats = w.RecomputeStats();
             if (d.rngState >= 0) w.rng.State = (uint)d.rngState;
             w.coreActive = d.senseCore == 1;
+            w.SeedCrack();
+            w.EnsureV13();               // миграция v1.2 → v1.3: NPC, флаги, атлас, посёлок
             w.HealPlayerPosition();
             return w;
+        }
+
+        // ===== Миграция v1.2 → v1.3 (идемпотентна): NPC, флаги, атлас, посёлок =====
+        public void EnsureV13()
+        {
+            var d = data;
+            if (d.flags == null) d.flags = new Dictionary<string, double>();
+            if (d.worldRegions == null) d.worldRegions = new Dictionary<string, int>();
+            if (d.npcs == null) d.npcs = new List<Npc>();
+            if (d.npcs.Count == 0) d.npcs = ScNpcs.DefaultTrio(d);   // посёлок живёт и в старых мирах
+            if (d.player != null && d.player.discoveredSpecies == null) d.player.discoveredSpecies = new List<string>();
+            if (d.village != null)
+            {
+                if (d.village.military <= 0) d.village.military = 25;
+                if (d.village.raidCdDays <= 0 && !d.village.raidPending) d.village.raidCdDays = 2;
+            }
+            // «Чаша Отголосов»: игрок стоит в каком-то месте мира — оно открыто (дальше только ногами, п.9)
+            string here = DungeonActive || d.activeDungeon != null
+                ? ScAtlas.DungeonRegionId(d.activeDungeon)
+                : ScAtlas.RegionAt(d.player.x, d.player.y).id;
+            if (!d.worldRegions.ContainsKey(here)) d.worldRegions[here] = 1;
+        }
+
+        /// Тайная трещина: декор-вход + добыча в кармане для малого тела (веб: crackSeeded).
+        public void SeedCrack()
+        {
+            var d = data;
+            if (d.Flag("crackSeeded") == 1) return;
+            d.SetFlag("crackSeeded", 1);
+            var m = d.mapJson;
+            foreach (var spot in ScAtlas.CrackSpots)
+            {
+                m.deco.Add(new Deco { id = d.nextId++, kind = "crack", x = (float)spot.entranceX, y = (float)spot.entranceY, r = (float)spot.rOut, seed = d.seed });
+                for (int i = 0; i < 3; i++)
+                {
+                    double a = i / 3.0 * Math.PI * 2 + 0.5;
+                    Creature c = SpawnCreaturePublic("slug", Vec.Of(spot.pocketX + Math.Cos(a) * 0.8, spot.pocketY + Math.Sin(a) * 0.8));
+                    if (c != null) { c.hp = 10; c.ageDays = 1; }
+                }
+                Creature cr = SpawnCreaturePublic("crystalslug", Vec.Of(spot.pocketX, spot.pocketY + 0.9));
+                if (cr != null) { cr.hp = 14; cr.ageDays = 1; }
+            }
         }
 
         // ===== Производные характеристики (§9 + §10) =====
@@ -89,10 +144,22 @@ namespace ServerClosed.Core
 
         public void CaptureState() { data.rngState = rng.State; }
 
+        /// Быстрая прокрутка дневных тиков для проверки/смоука: те же DailyTick(1), что и при переходе дней кадрами.
+        public void AdvanceDaysForTests(int days)
+        {
+            for (int i = 0; i < days && data.deathCause == null; i++) DailyTick(1);
+            clock.Advance(days * 1440.0);
+            data.minutes = clock.minutes;
+            data.dayTicks = clock.dayTickCounter;
+        }
+
         // A new body in the existing world; world history, clock and population survive.
         // Поток перерождения — порт engine.ts reincarnate: суд уже применён к душе (RunJudgment
         // при смерти), здесь — небытие (скачок времени), новое тело, ролл региона (ролл сделан при суде).
-        public bool Reincarnate()
+        public bool Reincarnate() { return ReincarnateWith(null); }
+
+        /// Перерождение с выбранным в UI вариантом тела (§11.3); null — как в v1.2 (последний вариант).
+        public bool ReincarnateWith(string optionId)
         {
             if (data.deathCause == null || data.soul == null) return false;
             if (data.judged == 0) RunJudgment();      // страховка: суд обязателен до перерождения
@@ -113,9 +180,12 @@ namespace ServerClosed.Core
             rng.Shuffle(pool);
             var carried = new List<string>();
             for (int i = 0; i < pool.Count && carried.Count < carryCount; i++) carried.Add(pool[i]);
-            // вариант тела: лучший из доступных душе (выбор в UI — следующий шаг; в вебе выбирает игрок)
+            // вариант тела: игрок выбирает на экране Реинкарнации (§11.3); null — авто (последний)
             var opts = ScSoul.ReincarnationOptions(soul);
-            ReincarnOption opt = opts[opts.Count - 1];
+            ReincarnOption opt = null;
+            if (!string.IsNullOrEmpty(optionId))
+                foreach (var o in opts) if (o.id == optionId) { opt = o; break; }
+            if (opt == null) opt = opts[opts.Count - 1];
 
             data.lifeNo++;
             data.player = new PlayerState
@@ -139,6 +209,16 @@ namespace ServerClosed.Core
             data.senseCore = soul.resonantCore ? 1 : 0;   // ядро — свойство души, а не тела
             data.nestExited = data.inNest = data.nestReadyShown = 0;
             data.activeDungeon = null;
+            // флаги жизни (§11.3): путь кармы от души, блаженства сбрасываются, рецепторы тела новые
+            data.SetFlag("soulBaseKarma", soul.karma);
+            data.SetFlag("lightBlessing", 0);
+            data.SetFlag("darkWhisper", 0);
+            data.SetFlag("soulXpLife", 0);
+            data.SetFlag("traitDepth", soul.traits != null ? soul.traits.depth : 0);
+            data.chess = null;                   // бой не переживает перерождение
+            InvalidateSeasonCache();
+            lastSeason = null;
+            crackHintT = 0;
             // подземелья перерождаются вместе с миром: обитатели забывают прошлые визиты (§11)
             foreach (var kv in data.dungeons)
             {
@@ -341,6 +421,25 @@ namespace ServerClosed.Core
             foreach (var deco in m.deco)
             {
                 if (deco.r <= 0) continue;
+                if (deco.kind == "crack" && deco.r >= 0.5)
+                {
+                    // тайная трещина: узкий проход только для малого тела (п.3 карты мира —
+                    // маленький слизень пролезает туда, куда не пролезет эволюционировавшая форма)
+                    if (ScRng.Dist(deco.x, deco.y, x, y) < deco.r * 0.8)
+                    {
+                        if (data.player.genome.installed.Count > ScAtlas.CRACK_MAX_ORGANS)
+                        {
+                            if (crackHintT <= 0)
+                            {
+                                crackHintT = 6;
+                                PushLog("Трещина слишком узка для вашего взрослого тела. Малый слизень прошёл бы… (нужно не больше 1 установленного гена)", "life");
+                            }
+                            return false;
+                        }
+                        continue; // малое тело проскальзывает сквозь трещину
+                    }
+                    continue;
+                }
                 if (ScRng.Dist(deco.x, deco.y, x, y) < deco.r * 0.8) return false;
             }
             return true;
@@ -385,10 +484,10 @@ namespace ServerClosed.Core
             return res;
         }
 
-        public void SpawnCreature(string species, Vec pos, int gen, string dungeonId = null, int dungeonFloor = 0)
+        public Creature SpawnCreature(string species, Vec pos, int gen, string dungeonId = null, int dungeonFloor = 0)
         {
             var def = Species.Get(species);
-            if (def == null) return;
+            if (def == null) return null;
             var c = new Creature
             {
                 id = data.nextId++,
@@ -402,6 +501,46 @@ namespace ServerClosed.Core
                 dungeonFloor = dungeonFloor,
             };
             data.creatures.Add(c);
+            return c;
+        }
+
+        /// Публичный спавн для систем над миром (NPC-сюжеты, трещина, подземелья).
+        public Creature SpawnCreaturePublic(string species, Vec pos)
+        {
+            return SpawnCreature(species, pos, data.dayTicks / 6 + 1);
+        }
+
+        /// Ополчение: два стража держат строй у ограды (world.ts spawnGuards).
+        void SpawnGuards()
+        {
+            Poi v = data.Poi("village");
+            if (v == null) return;
+            for (int i = 0; i < 2; i++)
+            {
+                double gx = v.x + (i == 1 ? 1.5 : -1.5), gy = v.y + 2.8;
+                Creature g = SpawnCreature("guard", Vec.Of(gx, gy), 1);
+                if (g != null)
+                {
+                    g.ai = "guard";
+                    g.homeX = (float)gx; g.homeY = (float)gy; g.hasHome = true;
+                }
+            }
+        }
+
+        /// Численность вида в надземном слое (web popCount; §6 уровень C).
+        public int PopCount(string species)
+        {
+            int n = 0;
+            foreach (var c in data.creatures)
+                if (c.species == species && !c.dead && c.dungeonFloor == 0) n++;
+            return n;
+        }
+
+        // ===== NPC посёлка (§15) =====
+        public Npc Npc(string id)
+        {
+            foreach (var n in data.npcs) if (n.id == id) return n;
+            return null;
         }
 
         public Vec SpawnPosNear(Poi poi, double rMin = 0.5, double? rMax = null)
@@ -472,11 +611,76 @@ namespace ServerClosed.Core
             }
 
             TickDigestion(dtSim);
+            crackHintT = Math.Max(0, crackHintT - dtReal);
             UpdateProximity();
             UpdateSenses(dtReal);
             ScSenses.TickSenses(data.senses, dtReal);
             UpdateRegionHazards(dtReal);   // погода региона течёт в реальном времени (как в вебе)
+            UpdateAtlasDiscovery();        // «Чаша Отголосов»: регион открывается ногами/чутьём (п.9)
         }
+
+        /// Флаг startRaid — движок открывает Magic Chess и сбрасывает флаг (engine.ts update).
+        public bool ConsumeStartRaid()
+        {
+            if (data.Flag("startRaid") != 1) return false;
+            data.flags.Remove("startRaid");
+            return true;
+        }
+
+        /// Движок забирает событие открытия места для тоста (consume).
+        public string ConsumeRegionDiscovery()
+        {
+            string id = data.lastDiscoveredRegion;
+            data.lastDiscoveredRegion = null;
+            return id;
+        }
+
+        // ===== Сезоны года (Этап 2 карты): экология дышит по календарю =====
+        /// Текущий сезон. Норка/подземелья — мини-вселенная: туда сезоны не доходят.
+        public string Season { get { return ScSeasons.SeasonOf(clock.TotalDays); } }
+        /// Модификаторы сезона; в подземельях — нейтральные (свой микроклимат).
+        public SeasonMods SeasonMods
+        {
+            get
+            {
+                if (seasonModsCache != null) return seasonModsCache;
+                seasonModsCache = DungeonActive || data.activeDungeon != null ? ScSeasons.Neutral : ScSeasons.Mods(Season);
+                return seasonModsCache;
+            }
+        }
+        public void InvalidateSeasonCache() { seasonModsCache = null; }
+
+        // ===== «Чаша Отголосов»: открытие мировых регионов (п.6/9) =====
+        public bool IsRegionDiscovered(string id)
+        {
+            int v;
+            return data.worldRegions != null && data.worldRegions.TryGetValue(id, out v) && v == 1;
+        }
+
+        /// Текущий мировой регион: подземный по слою или поверхностный по точке.
+        public string CurrentWorldRegionId()
+        {
+            if (DungeonActive && data.activeDungeon != null) return ScAtlas.DungeonRegionId(data.activeDungeon);
+            return ScAtlas.RegionAt(data.player.x, data.player.y).id;
+        }
+
+        public string CurrentWorldRegionName()
+        {
+            var def = ScAtlas.ById(CurrentWorldRegionId());
+            return def != null ? def.name : "Неизвестные земли";
+        }
+
+        void DiscoverRegion(string id)
+        {
+            if (IsRegionDiscovered(id)) return;
+            var def = ScAtlas.ById(id);
+            if (def == null || def.sealedArea) return; // запечатанные Глубины не открываются (Этап 4)
+            data.worldRegions[id] = 1;
+            data.lastDiscoveredRegion = id;
+            PushLog("Вы открыли место: " + def.name + ". " + def.ecology, "world");
+        }
+
+        void UpdateAtlasDiscovery() { DiscoverRegion(CurrentWorldRegionId()); }
 
         private bool IsInBattle()
         {
@@ -555,7 +759,13 @@ namespace ServerClosed.Core
             if (c.stunT > 0) { c.vx = 0; c.vy = 0; return; }
 
             // агро хищников и защита
-            if (!c.dead && def.diet == "carnivore" && d < 4.2 && (c.aggroByPlayer || rng.Chance(def.aggression * dt * 0.6)))
+            // путь Тьмы (§12): родные хищники не трогают своего; сезонный голод (Этап 2) дерзит зимой
+            bool kin = KarmaPath() == "Тьма" && !c.aggroByPlayer
+                       && (c.species == "wolf" || c.species == "spider" || c.species == "toad");
+            SeasonMods sm = SeasonMods;
+            double seasonAggro = 1 + Math.Max(0, sm.aggressionAdd) * 1.5 + Math.Min(0, sm.aggressionAdd) * 0.6;
+            double aggroR = 4.2 * ScRegions.Region(data.birthRegion).mods.aggressionMul * seasonAggro;
+            if (!c.dead && !kin && def.diet == "carnivore" && d < aggroR && (c.aggroByPlayer || rng.Chance(def.aggression * dt * 0.6 * seasonAggro)))
             { c.ai = "chase"; c.stateT = 6; }
 
             double nx = 0, ny = 0;
@@ -653,10 +863,63 @@ namespace ServerClosed.Core
                 data.player.kills++;
                 PushFx("kill", c.x, c.y, null, def.sentient ? "201,160,220" : "150,190,110");
                 if (def.sentient) Karma("kill_sentient", "Убийство разумного: " + def.name, -20, "bad");
+                // вожак стаи (§12 пощада + посёлок): стая уходит, оборона решена без шахмат
+                if (c.questTag == "alpha" && data.Flag("alphaKilled") == 0)
+                {
+                    data.SetFlag("alphaKilled", 1);
+                    data.alphaKilled = 1;
+                    OnAlphaKilled();
+                }
+                if (c.species == "wolf") data.flagWolvesKilled++;   // ретроактивный прогресс задания «Три шкуры»
                 // мир помнит павших владык подземелий (веса рождения + достижения души)
                 if (c.species == "myco_monarch") data.monarchKilled = 1;
                 if (c.species == "crystal_titan") data.titanKilled = 1;
+                // боссы подземелий (Регион 2/3): фирменный ген — гарантированная добыча
+                foreach (var ddef in ScDungeon.Defs)
+                {
+                    if (c.questTag == ddef.bossTag && !string.IsNullOrEmpty(ddef.bossFlag) && data.Flag(ddef.bossFlag) == 0)
+                    {
+                        if (ddef.bossFlag == "monarchKilled") data.monarchKilled = 1;
+                        if (ddef.bossFlag == "titanKilled") data.titanKilled = 1;
+                        data.SetFlag(ddef.bossFlag, 1);
+                        data.player.biomass += ddef.bossReward;
+                        if (!string.IsNullOrEmpty(ddef.bossGene) && !data.player.knownGenes.Contains(ddef.bossGene))
+                        {
+                            data.player.knownGenes.Add(ddef.bossGene);
+                            GeneDef bg;
+                            if (Genes.All.TryGetValue(ddef.bossGene, out bg))
+                                PushLog("Из праха павшего вы извлекли «" + bg.name + "».", "life");
+                        }
+                        PushLog(ddef.bossName + " рассыпается мерцающей пылью. Подземелье выдыхает.", "world");
+                        data.PushToast(ddef.bossName + " повержен(а)! Тьма подземелья отступает.", "epic");
+                    }
+                }
+                // прогресс заданий: убийства и боссы (§13)
+                TrackQuestKill(c.species, c.questTag);
             }
+        }
+
+        /// Вожак стаи пал: стая уходит из региона (пощада, §12), посёлок вздыхает свободнее.
+        void OnAlphaKilled()
+        {
+            var wolves = data.creatures.FindAll(cc => cc.species == "wolf" && !cc.dead);
+            int keep = Math.Min(2, wolves.Count);
+            foreach (var w in data.creatures)
+            {
+                if (w.species != "wolf" || w.dead) continue;
+                if (wolves.IndexOf(w) < keep) continue;
+                w.dead = true; w.absorbed = true; w.corpseT = 0;   // уходят за край леса
+            }
+            data.player.biomass += 40;
+            Npc dar = Npc("dar");
+            if (dar != null) dar.attitude = ScRng.Clamp(dar.attitude + 10, 0, 100);
+            data.village.raidCdDays = 5;
+            if (data.village.raidPending)
+            {
+                data.village.raidPending = false;
+                data.village.raidsSurvived++;
+            }
+            PushLog("Вожак стаи пал. Остальные волки ушли в глубину леса.", "world");
         }
 
         /// Смерть тела: code — машиночитаемая причина (old_age|killed|mutation), text — для журнала/экрана.
@@ -719,9 +982,18 @@ namespace ServerClosed.Core
             ScDigestion.PutItem(data.digestion, item);
             best.absorbed = true;
             data.player.absorbedCount++;
+            // события захвата: открытия, карма, задания — в момент захвата (§5.4, §11, §13)
+            if (!data.player.discoveredSpecies.Contains(best.species))
+            {
+                data.player.discoveredSpecies.Add(best.species);
+                PushLog("Строение существа изучено: " + def.name + ".", "life");
+                if (def.sentient) Karma("absorb_sentient", "Поглощение разумного: " + def.name, -15, "bad");
+            }
             if (best.species == "spirit") data.spiritAbsorbed = 1;   // воспоминание m_rift + глубина души
             Karma("absorb_" + best.species, "Поглощение: " + def.name, def.sentient ? -8 : 0, def.sentient ? "bad" : "neutral");
             PushFx("absorb", best.x, best.y, "+" + Math.Round(mass), "154,200,96");
+            // прогресс заданий: поглощения (§13)
+            TrackQuestAbsorb(best.species);
             return true;
         }
 
@@ -750,8 +1022,15 @@ namespace ServerClosed.Core
             double[] ki;
             double residue = Food.KindInfo.TryGetValue(Food.KindName(it.kind), out ki) ? ki[1] : 0.06;
             data.digestion.insoluble += it.mass * residue;
-            // питание рецепторов (Дополнение: диета)
-            var newly = ScSenses.GrantBiomass(data.senses, it.mass, SenseThrMul(), it.diet);
+            // питание рецепторов (Дополнение: диета); сезонная питательность пищи (Этап 2 — Увядание 1.3, Тьма 0.8)
+            double dietMul = SeasonMods.dietMul;
+            double[] effDiet = it.diet;
+            if (dietMul != 1 && it.diet != null)
+            {
+                effDiet = new double[it.diet.Length];
+                for (int i = 0; i < it.diet.Length; i++) effDiet[i] = i % 2 == 1 ? it.diet[i] * dietMul : it.diet[i];
+            }
+            var newly = ScSenses.GrantBiomass(data.senses, it.mass, SenseThrMul(), effDiet);
             foreach (var organ in newly)
             {
                 PushLog("Пробуждение: " + OrganName(organ) + ". Мир стал немного другим.", "life");
@@ -788,9 +1067,11 @@ namespace ServerClosed.Core
         private Dictionary<string, double> SenseThrMul()
         {
             var m = new Dictionary<string, double>();
-            double depthBoost = 0; // глубина души — заглушка v1 (см. README: soul traits)
-            if (depthBoost > 0)
-                foreach (var o in new[] { "chemo", "vibration", "thermal", "light", "vision", "hearing" }) m[o] = 1 - depthBoost;
+            // «Резонанс души» (п.6): глубина души ускоряет рецепторы, но не даёт зрения
+            double depth = data.soul != null && data.soul.traits != null ? data.soul.traits.depth : 0;
+            double thrBoost = Math.Min(0.25, depth * 0.0025);
+            if (thrBoost > 0)
+                foreach (var o in new[] { "chemo", "vibration", "thermal", "light", "vision", "hearing" }) m[o] = 1 - thrBoost;
             return m;
         }
 
@@ -974,17 +1255,53 @@ namespace ServerClosed.Core
                 }
         }
 
-        // ===== Близость: трупы для [E] =====
-        private void UpdateProximity()
+        // ===== Близость: трупы для [E], NPC, врата подземелий, лестницы, приносы =====
+        public void UpdateProximity()
         {
+            var p = data.player;
             nearCorpseId = -1;
             double best = 1.2;
             foreach (var c in ActiveCreatures())
             {
                 if (c.dead && !c.absorbed && c.corpseT > 0)
                 {
-                    double d = ScRng.Dist(c.x, c.y, data.player.x, data.player.y);
+                    double d = ScRng.Dist(c.x, c.y, p.x, p.y);
                     if (d < best) { best = d; nearCorpseId = c.id; }
+                }
+            }
+            nearNpcId = null; nearGateId = null;
+            nearStairsUp = false; nearStairsDown = false;
+            nearCacheId = -1;
+            if (DungeonActive)
+            {
+                DungeonState dun = Dun;
+                if (dun != null && dun.depth - 1 < dun.floors.Count)
+                {
+                    var f = dun.floors[dun.depth - 1];
+                    if (dun.depth < dun.floors.Count && ScRng.Dist(f.downX, f.downY, p.x, p.y) < 1.25) nearStairsDown = true;
+                    if (ScRng.Dist(f.upX, f.upY, p.x, p.y) < 1.25) nearStairsUp = true;
+                }
+                double bestC = 1.2;
+                foreach (var cache in dun.caches)
+                {
+                    if (cache.taken || cache.depth != dun.depth) continue;
+                    double d = ScRng.Dist(cache.x, cache.y, p.x, p.y);
+                    if (d < bestC) { bestC = d; nearCacheId = cache.id; }
+                }
+            }
+            else
+            {
+                foreach (var def in ScDungeon.Defs)
+                {
+                    Vec gate = def.gatePos(data);
+                    if (ScRng.Dist(gate.x, gate.y, p.x, p.y) < 1.5) { nearGateId = def.id; break; }
+                }
+                double bestN = 1.3;
+                foreach (var n in data.npcs)
+                {
+                    if (!n.alive) continue;
+                    double d = ScRng.Dist(n.x, n.y, p.x, p.y);
+                    if (d < bestN) { bestN = d; nearNpcId = n.id; }
                 }
             }
         }
@@ -1020,6 +1337,7 @@ namespace ServerClosed.Core
             if (dun.explored.Count == 0) dun.explored.Add(new List<int>());
             dun.returnX = data.player.x; dun.returnY = data.player.y;
             data.activeDungeon = "birth_nest";
+            InvalidateSeasonCache();   // мини-вселенная: свой микроклимат
             data.creatures.RemoveAll(c => c.dungeonId == "birth_nest");
             SpawnNestFloor(dun, data);
             var f0 = dun.floors[0];
@@ -1095,6 +1413,7 @@ namespace ServerClosed.Core
             }
             dun.active = false;
             data.activeDungeon = null;
+            InvalidateSeasonCache();   // вернулись в большой мир — сезоны снова действуют
             p.x = dun.returnX; p.y = dun.returnY;
             p.vx = 0; p.vy = 0;
             data.creatures.RemoveAll(c => c.dungeonId != null && c.dead);
@@ -1102,6 +1421,335 @@ namespace ServerClosed.Core
             data.inNest = 0;
             PushLog("Комочек протекает сквозь узкий лаз... большой мир обрушивается ощущениями.", "world");
             return true;
+        }
+
+        // ===== Подземелья-инстансы (Регион 2/3 + Подземное русло, §6) — порт dungeon-блока world.ts =====
+        public DungeonDef DungeonDefOf
+        {
+            get { return DungeonActive && data.activeDungeon != null ? ScDungeon.Def(data.activeDungeon) : null; }
+        }
+
+        public bool EnterDungeon(string id)
+        {
+            if (DungeonActive || data.deathCause != null) return false;
+            DungeonDef def = ScDungeon.Def(id);
+            if (def == null) return false;
+            Vec gate = def.gatePos(data);
+            var p = data.player;
+            if (ScRng.Dist(gate.x, gate.y, p.x, p.y) > 1.7) return false;
+            DungeonState dun;
+            if (!data.dungeons.TryGetValue(id, out dun) || dun == null)
+            {
+                dun = ScDungeon.CreateState(data.seed, id, gate.x + 0.9, gate.y + 1.5);
+                data.dungeons[id] = dun;
+            }
+            dun.active = true;
+            dun.depth = 1;
+            dun.returnX = (float)(gate.x + 0.9);
+            dun.returnY = (float)(gate.y + 1.5);
+            data.activeDungeon = id;
+            InvalidateSeasonCache();   // подземелье: нейтральный микроклимат
+            // подземелье переросло прошлый визит: убираем всё, что осталось, и зарождаем заново
+            data.creatures.RemoveAll(c => c.dungeonId == id);
+            SpawnDungeonFloor(id, 1);
+            data.dungeonEntered = 1;               // достижение descender + мир помнит смелость
+            AdvanceQuestForType("dungeon_enter", id);
+            // игрок переносится ко входу первого этажа (сцена меняется целиком)
+            DungeonFloor f0 = dun.floors[0];
+            p.x = f0.upX + 0.5f; p.y = f0.upY + 0.5f;
+            p.vx = 0; p.vy = 0; p.facing = 1;
+            senseMap.Clear();
+            data.PushToast(def.name + ". Глубина 1 из " + def.depths + ". Ищите лестницу вниз.", "epic");
+            PushLog(def.enterLog, "world");
+            return true;
+        }
+
+        public bool DescendStairs()
+        {
+            DungeonState dun = Dun;
+            string id = data.activeDungeon;
+            if (!DungeonActive || dun == null || id == null || dun.depth >= dun.floors.Count) return false;
+            DungeonFloor f = dun.floors[dun.depth - 1];
+            var p = data.player;
+            if (ScRng.Dist(f.downX, f.downY, p.x, p.y) > 1.45) return false;
+            dun.depth++;
+            data.creatures.RemoveAll(c => c.dungeonId != null && c.dead);
+            SpawnDungeonFloor(id, dun.depth);
+            DungeonFloor nf = dun.floors[dun.depth - 1];
+            p.x = nf.upX + 0.5f; p.y = nf.upY + 0.5f;
+            p.vx = 0; p.vy = 0;
+            senseMap.Clear();
+            PushLog("Глубина " + dun.depth + ". Давление камня растёт.", "world");
+            return true;
+        }
+
+        public bool AscendStairs()
+        {
+            DungeonState dun = Dun;
+            string id = data.activeDungeon;
+            if (!DungeonActive || dun == null || id == null) return false;
+            DungeonFloor f = dun.floors[dun.depth - 1];
+            var p = data.player;
+            if (ScRng.Dist(f.upX, f.upY, p.x, p.y) > 1.45) return false;
+            if (dun.depth <= 1)
+            {
+                dun.active = false;
+                data.activeDungeon = null;
+                InvalidateSeasonCache();   // поверхность: сезоны действуют
+                p.x = dun.returnX; p.y = dun.returnY;
+                p.vx = 0; p.vy = 0;
+                data.creatures.RemoveAll(c => c.dungeonId != null && c.dead);
+                senseMap.Clear();
+                DungeonDef def = ScDungeon.Def(id);
+                if (def != null) PushLog(def.exitLog, "world");
+                return true;
+            }
+            dun.depth--;
+            data.creatures.RemoveAll(c => c.dungeonId != null && c.dead);
+            SpawnDungeonFloor(id, dun.depth);
+            DungeonFloor nf = dun.floors[dun.depth - 1];
+            p.x = nf.downX + 0.5f; p.y = nf.downY + 0.5f;
+            p.vx = 0; p.vy = 0;
+            senseMap.Clear();
+            PushLog("Вы поднимаетесь на глубину " + dun.depth + ".", "world");
+            return true;
+        }
+
+        public bool TakeCache()
+        {
+            DungeonState dun = Dun;
+            if (!DungeonActive || dun == null || nearCacheId < 0) return false;
+            DungeonCache cache = dun.caches.Find(c => c.id == nearCacheId);
+            if (cache == null || cache.taken) return false;
+            DungeonDef def = DungeonDefOf;
+            if (def == null) return false;
+            cache.taken = true;
+            double amount = 8 + Math.Round(rng.Range(0, 6)) + cache.depth * 2;
+            data.player.biomass += amount;
+            // диета: принос тоже питает рецепторы по своему составу (сезонная питательность — Этап 2)
+            double[] cacheDiet;
+            if (!SensesData.DietFeed.TryGetValue("cache_" + def.cacheKind, out cacheDiet)) cacheDiet = null;
+            double dietMul = SeasonMods.dietMul;
+            if (cacheDiet != null && dietMul != 1)
+            {
+                var scaled = new double[cacheDiet.Length];
+                for (int i = 0; i < cacheDiet.Length; i++) scaled[i] = i % 2 == 1 ? cacheDiet[i] * dietMul : cacheDiet[i];
+                cacheDiet = scaled;
+            }
+            var newly = ScSenses.GrantBiomass(data.senses, amount, SenseThrMul(), cacheDiet);
+            foreach (var organ in newly)
+            {
+                PushLog("Пробуждение: " + OrganName(organ) + ". Мир стал немного другим.", "life");
+                data.PushToast("Новое чувство: " + OrganName(organ), "epic");
+            }
+            if (def.cacheKind == "crystal") GainOre(2 + ScRegions.Region(data.birthRegion).mods.oreBonus); // жила — источник руды (п.7)
+            PushLog((def.cacheKind == "crystal" ? "Кристальная жила выломана" : "Запас грибницы собран") + ": +" + amount + " биомассы.", "life");
+            return true;
+        }
+
+        void SpawnDungeonFloor(string id, int depth)
+        {
+            DungeonDef def = ScDungeon.Def(id);
+            DungeonState dun;
+            if (def == null || !data.dungeons.TryGetValue(id, out dun) || dun == null) return;
+            bool bossAlive = !string.IsNullOrEmpty(def.bossFlag) && data.Flag(def.bossFlag) == 0;
+            string[][] plan = def.spawnPlan(depth, bossAlive);
+            DungeonFloor f = dun.floors[depth - 1];
+            foreach (string[] pair in plan)
+            {
+                int count;
+                if (!int.TryParse(pair[1], out count)) count = 1;
+                for (int i = 0; i < count; i++)
+                {
+                    Creature c = SpawnCreature(pair[0], DungeonSpawnPos(f), data.dayTicks / 6 + 1, id, depth);
+                    if (c != null && pair[0] == def.bossSpecies && !string.IsNullOrEmpty(def.bossTag))
+                    {
+                        c.questTag = def.bossTag;
+                        c.name = def.bossName;
+                    }
+                }
+            }
+        }
+
+        Vec DungeonSpawnPos(DungeonFloor f)
+        {
+            for (int i = 0; i < 60; i++)
+            {
+                int x = rng.Int(1, f.w - 2), y = rng.Int(1, f.h - 2);
+                if (f.terrain[y * f.w + x] == "rock") continue;
+                if (Math.Sqrt((x - f.upX) * (x - f.upX) + (y - f.upY) * (y - f.upY)) < 3) continue; // не у самого входа
+                return Vec.Of(x + 0.5, y + 0.5);
+            }
+            return Vec.Of(f.upX + 2, f.upY);
+        }
+
+        // ===== Задания посёлка (§13) — порт quest-хуков world.ts =====
+        void AdvanceQuest(string qid, double add)
+        {
+            var q = ScQuests.ById(qid);
+            if (q == null || !ScQuests.Accepted(data, qid) || ScQuests.Done(data, qid)) return;
+            double cur = ScQuests.Progress(data, qid);
+            if (cur >= q.need) return;
+            double nv = Math.Min(q.need, cur + add);
+            data.SetFlag("quest_progress_" + qid, nv);
+            if (nv >= q.need)
+                PushLog("Задание выполнено: «" + q.title + "». Награда ждёт у давшего его жителя посёлка.", "village");
+        }
+
+        /// Прогресс по типу задания (вход в подземелье по id).
+        void AdvanceQuestForType(string type, string target)
+        {
+            foreach (var q in ScQuests.Quests)
+                if (q.type == type && q.target == target) AdvanceQuest(q.id, 1);
+        }
+
+        void TrackQuestKill(string species, string questTag)
+        {
+            foreach (var q in ScQuests.Quests)
+            {
+                if (q.type == "kill" && q.target == species) AdvanceQuest(q.id, 1);
+                if (q.type == "boss" && q.target == questTag) AdvanceQuest(q.id, 1);
+            }
+        }
+
+        void TrackQuestAbsorb(string species)
+        {
+            foreach (var q in ScQuests.Quests)
+                if (q.type == "absorb" && q.target == species) AdvanceQuest(q.id, 1);
+        }
+
+        /// Принять задание у NPC (§13); ретроактивный прогресс — мир помнит подвиги.
+        public bool AcceptQuest(string qid)
+        {
+            var q = ScQuests.ById(qid);
+            if (q == null || ScQuests.Accepted(data, qid) || ScQuests.Done(data, qid)) return false;
+            if (!string.IsNullOrEmpty(q.requires) && !ScQuests.Done(data, q.requires)) return false;
+            data.SetFlag("quest_accepted_" + qid, 1);
+            // ретроактивный прогресс: убитые до принятия волки засчитываются
+            data.SetFlag("quest_progress_" + qid, qid == "wolves" ? Math.Min(3, data.flagWolvesKilled) : 0);
+            // боссы и подземелья тоже засчитываются задним числом — мир помнит подвиги (§13)
+            if (q.type == "boss" && !string.IsNullOrEmpty(q.target))
+            {
+                foreach (var ddef in ScDungeon.Defs)
+                    if (ddef.bossTag == q.target && data.Flag(ddef.bossFlag) == 1) data.SetFlag("quest_progress_" + qid, 1);
+            }
+            if (q.type == "dungeon_enter" && !string.IsNullOrEmpty(q.target) && data.dungeons.ContainsKey(q.target))
+                data.SetFlag("quest_progress_" + qid, 1);
+            if (qid == "wolves") data.SetFlag("wolfQuestAccepted", 1); // совместимость: маркер логова вожака
+            PushLog("Принято задание: «" + q.title + "».", "village");
+            return true;
+        }
+
+        /// Сдать задание: награда, карма, запись в хронику (§13).
+        public bool TurnInQuest(string qid)
+        {
+            var q = ScQuests.ById(qid);
+            if (q == null || !ScQuests.Accepted(data, qid) || ScQuests.Done(data, qid) || ScQuests.Progress(data, qid) < q.need) return false;
+            data.SetFlag("quest_done_" + qid, 1);
+            data.SetFlag("questJustDone", 1);   // UI покажет тост
+            if (qid == "wolves") data.wolfQuestDone = 1;   // совместимость с милосердием черт души
+            var parts = new List<string>();
+            if (q.biomass > 0) { data.player.biomass += q.biomass; parts.Add("+" + q.biomass + " биомассы"); }
+            Karma("quest_" + qid, "Задание выполнено: «" + q.title + "»", q.karma, "good", q.soulXp);
+            PushLog("Награда за «" + q.title + "»: " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "благодарность посёлка") + ".", "village");
+            return true;
+        }
+
+        // ===== Поселение: торговля и репутация (§15, §3.2) =====
+        /// Отдать 10 биомассы в запасы посёлка (+карма, +прогресс задания «Голодный год»).
+        public bool DonateFood()
+        {
+            var p = data.player;
+            if (p.biomass < 10) return false;
+            p.biomass -= 10;
+            data.village.food += 12;
+            data.village.stability = ScRng.Clamp(data.village.stability + 2, 0, 100);
+            foreach (var n in data.npcs) n.attitude = ScRng.Clamp(n.attitude + 5, 0, 100);
+            Karma("donate_food", "Передача биомассы в запасы поселения", 6, "good", 3);
+            data.donateCount++;   // хищная природа видит щедрость
+            // прогресс заданий: пожертвования (§13)
+            foreach (var q in ScQuests.Quests)
+                if (q.type == "donate") AdvanceQuest(q.id, 1);
+            return true;
+        }
+
+        /// Тихо обчистить склад (−карма; раз в день).
+        public bool StealFood()
+        {
+            var p = data.player;
+            if (data.flagStealCd > clock.TotalDays) return false;
+            data.flagStealCd = clock.TotalDays + 1;
+            p.biomass += 12;
+            data.village.food = Math.Max(0, data.village.food - 10);
+            data.village.stability = ScRng.Clamp(data.village.stability - 3, 0, 100);
+            foreach (var n in data.npcs) n.attitude = ScRng.Clamp(n.attitude - 12, 0, 100);
+            Karma("steal_food", "Тайная кража еды со склада поселения", -8, "bad");
+            return true;
+        }
+
+        /// Рядом хищник — отдых небезопасен (движок ставит скорость «battle»).
+        public bool DangerNear()
+        {
+            var p = data.player;
+            foreach (var c in ActiveCreatures())
+            {
+                if (c.dead || c.species == "guard") continue;
+                var def = Species.Get(c.species);
+                if (def.diet != "carnivore") continue;
+                if (ScRng.Dist(c.x, c.y, p.x, p.y) < 5.5) return true;
+            }
+            return false;
+        }
+
+        /// Миграции при смене сезона (Этап 2 карты): часть популяций стягивается к пищевым узлам.
+        /// Мягкая сила: переназначаем дом и подтягиваем часть особей шагом (без телепортов).
+        void MigrateForSeason(string season)
+        {
+            var poiNames = new Dictionary<string, string>
+            {
+                { "village", "людским очагам" }, { "pond", "пруду" }, { "mushroom_grove", "грибной роще" },
+                { "crystal_hollow", "кристальной нише" }, { "stone_circle", "каменному кругу" },
+                { "burrow", "норе у корней" }, { "rift", "разлому" },
+            };
+            var plan = ScSeasons.MigrationsFor(season);
+            if (plan.Count == 0) return;
+            // агрегируем по точке приюта: одна запись в хронику на направление
+            var byPoi = new Dictionary<string, List<string>>();
+            foreach (var kv in plan)
+            {
+                Poi poi = data.Poi(kv.Value);
+                if (poi == null) continue;
+                var crowd = data.creatures.FindAll(c => c.species == kv.Key && !c.dead && c.dungeonFloor == 0);
+                // мигрирует до половины стаи — мир меняется постепенно, стая не исчезает целиком
+                int movers = (int)Math.Ceiling(crowd.Count * 0.5);
+                for (int i = 0; i < movers && i < crowd.Count; i++)
+                {
+                    var c = crowd[i];
+                    double a = rng.Next() * Math.PI * 2;
+                    double r = 1 + rng.Next() * poi.r * 0.7;
+                    double hx = poi.x + Math.Cos(a) * r, hy = poi.y + Math.Sin(a) * r * 0.7;
+                    c.homeX = (float)hx; c.homeY = (float)hy; c.hasHome = true;
+                    if (c.ai == "idle" || c.ai == "wander")
+                    {
+                        c.ai = "wander";
+                        c.wx = (float)hx; c.wy = (float)hy; c.hasWanderTo = true;
+                        c.stateT = 6 + rng.Next() * 8;
+                    }
+                }
+                if (movers > 0)
+                {
+                    List<string> names;
+                    if (!byPoi.TryGetValue(kv.Value, out names)) { names = new List<string>(); byPoi[kv.Value] = names; }
+                    SpeciesDef sd = Species.Get(kv.Key);
+                    names.Add(sd != null ? sd.name.ToLower() : kv.Key);
+                }
+            }
+            foreach (var kv in byPoi)
+            {
+                string label;
+                if (!poiNames.TryGetValue(kv.Key, out label)) label = kv.Key;
+                PushLog("Зверь смещается: " + string.Join(", ", kv.Value.ToArray()) + " — к " + label + ".", "world");
+            }
         }
 
         // ===== Самолечение позиции (страховка «пропавшего героя») =====
@@ -1148,41 +1796,253 @@ namespace ServerClosed.Core
             return true;
         }
 
-        // ===== Дневные тики (§6 уровень C): старение, смертность, популяции =====
+        // ===== Дневные тики (§6 уровень C): сезоны, старение, смертность, NPC, популяции, посёлок, набеги =====
         private void DailyTick(int days)
         {
             var p = data.player;
-            p.ageDays += days;
-            RefreshStats();
-            // смертность игрока (Гомпертц §10)
-            double mort = ScAging.DailyMortality(p.ageDays, stats.lifeDays);
-            if (rng.Chance(mort)) { KillPlayer("old_age", "Тело состарилось и растеклось."); return; }
+            var d = data;
 
-            // старение и смерть существ, восстановление популяций
-            for (int i = data.creatures.Count - 1; i >= 0; i--)
+            // 0. СЕЗОНЫ (Этап 2 карты): смена сезона → хроника + миграции. Норка — вне сезонов.
+            bool inNestLike = d.activeDungeon != null;   // подземелья и норка — свой микроклимат
+            string curSeason = ScSeasons.SeasonOf(clock.TotalDays);
+            bool seasonChanged = lastSeason != null && lastSeason != curSeason;
+            lastSeason = curSeason;
+            InvalidateSeasonCache();
+            if (seasonChanged && !inNestLike)
             {
-                var c = data.creatures[i];
-                if (c.dungeonId != null) continue;
-                var def = Species.Get(c.species);
-                c.ageDays += days;
-                if (c.dead && (c.corpseT -= days * 60) <= -60) { data.creatures.RemoveAt(i); continue; }
-                if (!c.dead && rng.Chance(ScAging.DailyMortality(c.ageDays, def.lifespan))) { data.creatures.RemoveAt(i); continue; }
+                PushLog(ScSeasons.SeasonLog(curSeason), "world");
+                MigrateForSeason(curSeason);
             }
-            foreach (var kv in Species.All)
+
+            // 0. Родовая норка: добыча восполняется медленно — сидеть в безопасности невыгодно
+            if (d.activeDungeon == "birth_nest" && d.dungeons.ContainsKey("birth_nest"))
             {
-                var def = kv.Value;
-                if (def.popCap <= 0) continue;
-                int count = 0;
-                foreach (var c in data.creatures)
-                    if (c.species == kv.Key && !c.dead && c.dungeonFloor == 0) count++;
-                if (count < def.popCap && rng.Chance(0.4))
+                int alive = 0;
+                foreach (var c in d.creatures) if (c.dungeonId == "birth_nest" && !c.dead) alive++;
+                if (alive < 9 && rng.Chance(0.45))
                 {
-                    Poi poi = data.Poi(PoiKeyFor(kv.Key));
-                    if (poi != null) SpawnCreature(kv.Key, SpawnPosNear(poi), data.dayTicks / 6 + 1);
+                    string[] pool = { "slug", "beetle", "mushling", "firefly", "slug" };
+                    Creature c2 = SpawnCreature(pool[rng.Int(0, pool.Length - 1)], NestFreePos(d.dungeons["birth_nest"].floors[0]), d.dayTicks / 6 + 1, "birth_nest", 1);
                 }
             }
-            // дневной прирост энергии
-            data.player.energy = Math.Min(stats.energyMax, data.player.energy + 2);
+
+            // 1. Старение игрока (§10)
+            p.ageDays += days;
+            RefreshStats();
+            if (p.hp > stats.maxHp) p.hp = stats.maxHp;
+            string newStage = ScAging.LifeStageOf(p.ageDays, stats.lifeDays);
+            if (d.Flag("lastStage") != StageNum(newStage))
+            {
+                d.SetFlag("lastStage", StageNum(newStage));
+                if (newStage == "Старение") PushLog("Ваше тело вступает в стадию Старения. Силы уже не те, зато опыт глубже.", "life");
+                if (newStage == "Угасание") PushLog("Угасание. Дни сочатся медленно, и вы чувствуете, как душа готовится к пути.", "life");
+            }
+
+            // 2. Проверка естественной смерти — по игровому дню, не по кадру (§10)
+            for (int i = 0; i < days; i++)
+            {
+                if (rng.Chance(ScAging.DailyMortality(p.ageDays, stats.lifeDays)))
+                {
+                    KillPlayer("old_age", "Тело состарилось и растеклось.");
+                    return;
+                }
+            }
+
+            // 3. Мутации от нестабильного генома (§9.2)
+            if (stats.stability < 40 && rng.Chance(0.22))
+            {
+                p.mutations++;
+                p.hp = Math.Min(p.hp, stats.maxHp);
+                PushLog("Геном дрожит: клеточная мутация ослабила тело (−2 к максимуму здоровья). Стабилизируйте геном.", "life");
+                if (stats.stability < 15 && rng.Chance(0.3))
+                {
+                    p.hp -= 4;
+                    if (p.hp <= 0) { KillPlayer("mutation", "Тело не выдержало."); return; }
+                }
+            }
+
+            // 4. Старение NPC и смена поколений (§15: правители стареют и умирают)
+            for (int ni = d.npcs.Count - 1; ni >= 0; ni--)
+            {
+                var n = d.npcs[ni];
+                if (!n.alive) continue;
+                n.ageDays += days;
+                if (n.ageDays > n.lifespan && rng.Chance(ScAging.DailyMortality(n.ageDays, n.lifespan)))
+                {
+                    n.alive = false;
+                    d.village.stability = ScRng.Clamp(d.village.stability - 8, 0, 100);
+                    PushLog(n.name + " умер(ла) от старости. Поселение скорбит.", "village");
+                    // смена власти / преемник
+                    if (n.id == "mirra")
+                    {
+                        d.npcs.Add(new Npc { id = "ivo", name = "Старейшина Иво", role = "новый старейшина", x = n.x, y = n.y, ageDays = 40, lifespan = 400, alive = true, attitude = 40, dialogue = "hello_successor" });
+                        PushLog("Молодой Иво становится старейшиной. Его помнят только ваши рассказы.", "village");
+                    }
+                    if (n.id == "dar")
+                        d.npcs.Add(new Npc { id = "rinsa", name = "Охотница Ринса", role = "новый охотник", x = n.x, y = n.y, ageDays = 30, lifespan = 320, alive = true, attitude = 35, dialogue = "hello_successor" });
+                    if (n.id == "klumba")
+                        d.npcs.Add(new Npc { id = "prokh", name = "Огородник Прох", role = "фермер", x = n.x, y = n.y, ageDays = 36, lifespan = 340, alive = true, attitude = 40, dialogue = "hello_successor" });
+                }
+            }
+
+            // 5. Популяции: рождаемость и поколения (§6 уровень C) — сезоны дышат (Этап 2)
+            d.dayTicks += 0;   // поколение считается из дня мира
+            int gen = d.dayTicks / 6 + 1;
+            SeasonMods sm = SeasonMods;
+            string[] speciesSeen = { "slug", "beetle", "firefly", "rabbit", "deer", "wolf", "toad", "spider", "mushling", "crystalslug", "shardling", "spirit" };
+            foreach (string sp in speciesSeen)
+            {
+                SpeciesDef def = Species.Get(sp);
+                if (def == null || def.popCap <= 0) continue;
+                int pop = PopCount(sp);
+                if (pop >= def.popCap) continue;
+                double rate = sp == "spirit" ? 0.05 : sp == "crystalslug" || sp == "shardling" ? 0.08 : sp == "wolf" ? 0.22 : 0.35;
+                double seasonal = rate * sm.birthMul * ScSeasons.SeasonalSpawnBoost(sp, curSeason);
+                if (rng.Chance(seasonal * days))
+                {
+                    // духи возрождаются и у Разлома (регион предельной сложности — п.3)
+                    string poiKey;
+                    if (sp == "wolf") poiKey = "burrow";
+                    else if (sp == "toad" || sp == "firefly") poiKey = "pond";
+                    else if (sp == "spider" || sp == "mushling") poiKey = "mushroom_grove";
+                    else if (sp == "crystalslug" || sp == "shardling") poiKey = "crystal_hollow";
+                    else if (sp == "spirit") poiKey = d.Poi("rift") != null && rng.Chance(0.4) ? "rift" : "stone_circle";
+                    else poiKey = "village";
+                    Poi poi = d.Poi(poiKey);
+                    if (poi != null) SpawnCreature(sp, SpawnPosNear(poi), gen);
+                }
+            }
+
+            // 6. Поселение: экономика дня (§15) + стадия роста
+            var v = d.village;
+            string stageName; double stageFoodBonus;
+            ScQuests.VillageStageOf(v.population, out stageName, out stageFoodBonus);
+            if (v.stage != stageName)
+            {
+                if (stageName == "Деревня") PushLog("Опушка разрослась: теперь это Деревня. Тропы стали шире.", "village");
+                if (stageName == "Посад") PushLog("Опушка стала Посадом — слава о спокойном месте тянет людей.", "village");
+                v.stage = stageName;
+            }
+            v.food = v.food + 3 + stageFoodBonus - Math.Ceiling(v.population * 0.4) + sm.villageFoodDelta;
+            if (v.food < 0)
+            {
+                v.food = 0;
+                if (rng.Chance(0.5))
+                {
+                    v.population = Math.Max(3, v.population - 1);
+                    v.stability = ScRng.Clamp(v.stability - 4, 0, 100);
+                    PushLog("В Опушке голод: запасы иссякли, кто-то покинул поселение.", "village");
+                }
+            }
+            else if (v.food > 60 && rng.Chance(0.3))
+            {
+                v.population += 1;
+                PushLog("В Опушке родился ребёнок. Поселение растёт.", "village");
+            }
+            v.stability += v.stability < 50 ? 1 : v.stability > 70 ? -1 : 0;
+            if (v.raidCdDays > 0) v.raidCdDays -= days;
+
+            // 6.5 Пути кармы (§12): мир реагирует на то, кем стала душа
+            string path = KarmaPath();
+            if (path == "Свет")
+            {
+                v.food += 2;
+                p.biomass += 1;
+                if (d.Flag("lightBlessing") == 0)
+                {
+                    d.SetFlag("lightBlessing", 1);
+                    PushLog("Путь Света: посёлок оставляет вам подношение у тропы (+2 еды посёлку, +1 биомассы вам каждый день).", "karma");
+                }
+            }
+            else if (path == "Тьма" && d.Flag("darkWhisper") == 0)
+            {
+                d.SetFlag("darkWhisper", 1);
+                PushLog("Путь Тьмы: волки больше не видят в вас добычу, а голод внутри стал сильнее.", "karma");
+            }
+
+            // 7. Набег волков
+            if (!v.raidPending && v.raidCdDays <= 0)
+            {
+                int wolves = PopCount("wolf");
+                if (wolves >= 4 && rng.Chance(0.4))
+                {
+                    v.raidPending = true;
+                    v.raidDeadline = clock.TotalDays + 1;
+                    PushLog("ВОЛКИ У ОГРАДЫ! Стая кружит у поселения. Дар зовёт к обороне.", "village");
+                }
+            }
+            if (v.raidPending)
+            {
+                if (clock.TotalDays >= v.raidDeadline)
+                {
+                    // игрок проигнорировал — поселение платит
+                    v.raidPending = false;
+                    v.raidCdDays = 3;
+                    v.food = Math.Max(0, v.food - 16);
+                    v.population = Math.Max(3, v.population - 2);
+                    v.stability = ScRng.Clamp(v.stability - 12, 0, 100);
+                    PushLog("Стая прорвалась в посёлок: запасы разграблены, люди погибли. Вы не пришли.", "village");
+                    Karma("ignored_raid", "Игнорирование набега: поселение пострадало", -10, "bad");
+                    // волки уходят сытыми
+                    Poi burrow = d.Poi("burrow");
+                    if (burrow != null)
+                        foreach (var w in d.creatures)
+                            if (w.species == "wolf" && !w.dead)
+                            {
+                                w.x = (float)(burrow.x + rng.Range(-2, 2));
+                                w.y = (float)(burrow.y + rng.Range(-2, 2));
+                            }
+                }
+                else
+                {
+                    // волки подошли к деревне
+                    Poi vil = d.Poi("village");
+                    if (vil != null)
+                    {
+                        int wi = 0;
+                        foreach (var w in d.creatures)
+                        {
+                            if (w.species != "wolf" || w.dead || wi >= 5) continue;
+                            double a = wi / 5.0 * Math.PI * 2;
+                            double tx = vil.x + Math.Cos(a) * (vil.r + 2.5);
+                            double ty = vil.y + Math.Sin(a) * (vil.r + 2.5) * 0.82;
+                            StepToward(w, tx, ty, Species.Get("wolf").speed, 0.016);
+                            wi++;
+                        }
+                    }
+                }
+            }
+        }
+
+        static double StageNum(string stage)
+        {
+            string[] stages = { "Зарождение", "Молодость", "Расцвет", "Старение", "Угасание" };
+            int i = Array.IndexOf(stages, stage);
+            return i >= 0 ? i : 0;
+        }
+
+        // ===== Карма (§12): текущая жизнь — кламп для HUD, безклампная сумма — для суда и черт; путь — от души =====
+        public string KarmaPath()
+        {
+            double total = (data.soul != null ? data.soul.karma : 0) + data.karmaTotal;
+            return ScQuests.KarmaPathOf(total);   // пороги ±40 — как в вебе (karmaPathOf)
+        }
+
+        private void Karma(string id, string title, double delta, string tag) { Karma(id, title, delta, tag, 0); }
+
+        private void Karma(string id, string title, double delta, string tag, double xp)
+        {
+            data.karma = ScRng.Clamp(data.karma + delta, -100, 100);
+            data.karmaTotal += delta;   // суду нужна сумма без клампа (как flags.karmaTotal в вебе)
+            if (xp > 0) data.SetFlag("soulXpLife", data.Flag("soulXpLife") + xp);
+            data.karmaEvents.Add(new KarmaEvent { day = clock.TotalDays, year = clock.Year, id = id, title = title, karma = delta, tag = tag });
+            if (delta != 0) PushLog(title + " [" + (delta > 0 ? "+" : "") + delta + " кармы]", "karma");
+        }
+
+        /// Публичная карма для систем над миром (шахматы — §14/§20).
+        public void KarmaPublic(string id, string title, double delta, string tag, double xp)
+        {
+            Karma(id, title, delta, tag, xp);
         }
 
         private string PoiKeyFor(string species)
@@ -1196,23 +2056,6 @@ namespace ServerClosed.Core
                 case "spirit": return "stone_circle";
                 default: return "village";
             }
-        }
-
-        // ===== Карма (§12): текущая жизнь — кламп для HUD, безклампная сумма — для суда и черт; путь — от души =====
-        public string KarmaPath()
-        {
-            double total = (data.soul != null ? data.soul.karma : 0) + data.karmaTotal;
-            if (total >= 25) return "Свет";
-            if (total <= -25) return "Тьма";
-            return "Равновесие";
-        }
-
-        private void Karma(string id, string title, double delta, string tag)
-        {
-            data.karma = ScRng.Clamp(data.karma + delta, -100, 100);
-            data.karmaTotal += delta;   // суду нужна сумма без клампа (как flags.karmaTotal в вебе)
-            data.karmaEvents.Add(new KarmaEvent { day = clock.TotalDays, year = clock.Year, id = id, title = title, karma = delta, tag = tag });
-            if (delta != 0) PushLog(title + " [" + (delta > 0 ? "+" : "") + delta + " кармы]", "karma");
         }
 
         // ===== Журнал и FX =====
